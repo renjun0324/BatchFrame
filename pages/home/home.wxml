@@ -1,0 +1,23 @@
+<view class="container">
+  <view class="header">
+    <text class="app-title">批量边框助手</text>
+    <text class="app-subtitle">快速为多张照片添加边框</text>
+  </view>
+
+  <view class="feature-cards">
+    <view class="feature-card" bindtap="goToFrame">
+      <view class="feature-icon">🖼️</view>
+      <text class="feature-title">开始使用</text>
+      <text class="feature-desc">选择照片并添加边框</text>
+    </view>
+  </view>
+
+  <!-- 作者联系方式 -->
+  <view class="contact-section">
+    <view class="contact-info">
+      <text class="contact-label">作者联系方式：</text>
+      <text class="contact-email">312827559@qq.com</text>
+    </view>
+    <text class="contact-note">如有问题或建议，欢迎联系作者</text>
+  </view>
+</view>

@@ -1,0 +1,116 @@
+.container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.app-title {
+  font-size: 32px;
+  font-weight: bold;
+  color: #fff;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.app-subtitle {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.8);
+  display: block;
+}
+
+.feature-cards {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.feature-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 20px;
+  padding: 30px 24px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+.feature-card:active {
+  transform: scale(0.98);
+}
+
+.feature-card.disabled {
+  opacity: 0.6;
+}
+
+.feature-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.feature-title {
+  display: block;
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.feature-desc {
+  display: block;
+  font-size: 14px;
+  color: #666;
+}
+
+.footer {
+  margin-top: 40px;
+}
+
+.footer-text {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* 联系方式样式 - 低调版本 */
+.contact-section {
+  margin-top: auto;
+  margin-bottom: 75rpx; /* 距离底部约1cm */
+  padding: 12px 0;
+  text-align: center;
+  width: 100%;
+  max-width: 360px;
+}
+
+.contact-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.contact-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.contact-email {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.contact-note {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  font-style: normal;
+}

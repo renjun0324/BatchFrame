@@ -1,0 +1,335 @@
+/* Layout */
+.page { padding: 12px; background: #0f1115; }
+.panel { max-width: 360px; margin: 0 auto; }
+.row { display:flex; align-items:center; gap:10px; }
+.head { justify-content: space-between; margin-bottom: 8px; }
+
+/* Chips */
+.chips { white-space:nowrap; margin:6px 0 8px; }
+.chip {
+  display:inline-block; padding:5px 9px; margin-right:6px;
+  background:#1b1f2a; color:#c9d1d9; border:1px solid #2d333b; border-radius:16px;
+  font-size:12px;
+}
+.chip.active { background:#2f81f7; color:#fff; border-color:#2f81f7; }
+
+/* Card preview */
+.card {
+  position:relative; background:#0b0d12; padding:8px; border-radius:12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.03);
+  display:flex; justify-content:center;
+}
+.badge {
+  position:absolute; right:8px; top:8px; background:rgba(0,0,0,.55);
+  color:#fff; font-size:11px; padding:2px 5px; border-radius:8px;
+}
+
+/* Form */
+.form { margin-top:12px; display:flex; flex-direction:column; gap:12px; }
+.form-row { display:flex; align-items:center; justify-content:space-between; }
+.label { color:#a9b1ba; width:90px; }
+.controls { display:flex; align-items:center; gap:8px; }
+.input {
+  width:80px; padding:6px 8px; border:1px solid #2d333b; border-radius:10px;
+  background:#0f1320; color:#eaecef; text-align:center;
+}
+
+/* Buttons */
+.btn { border-radius:12px; }
+.btn.primary {
+  background:#2f81f7; color:#fff; padding:10px 12px; border:none;
+  box-shadow:0 6px 20px rgba(47,129,247,.35);
+}
+.btn.ghost {
+  background:transparent; color:#eaecef; border:1px solid #2d333b;
+}
+.btn:active { opacity:.8; }
+
+/* Thumbs */
+.thumbs { white-space:nowrap; margin:14px 0; }
+.thumb { width:56px; height:56px; object-fit:cover; margin-right:8px; border:2px solid transparent; border-radius:10px; background:#141820; }
+.thumb.active { border-color:#2f81f7; }
+
+/* Actions */
+.actions { margin-top:6px; flex-direction:column; gap:6px; justify-content:center; }
+
+/* Color Picker */
+.controls-with-switch { display:flex; align-items:center; gap:8px; }
+.color-options { white-space:nowrap; margin:8px 0; }
+.color-item {
+  display:inline-block; width:30px; height:30px; margin-right:6px;
+  border-radius:50%; border:2px solid transparent; cursor:pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+.color-item.active { border-color:#2f81f7; box-shadow:0 0 0 3px rgba(47,129,247,.3); }
+.color-item:active { opacity:.8; }
+
+/* Compact form rows for color pickers */
+.form-row.compact { 
+  flex-direction: column; 
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.color-picker-container {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.color-options-horizontal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.color-item.custom-color {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1b1f2a;
+  border: 1px dashed #2d333b;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+
+.custom-color-text {
+  color: #eaecef;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* 颜色选择器弹窗 */
+.color-picker-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.color-picker-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.color-picker-content {
+  position: relative;
+  width: 100%;
+  max-height: 70vh;
+  background: #1b1f2a;
+  border-radius: 16px 16px 0 0;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.color-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+}
+
+/* 模式切换标签 */
+.color-mode-tabs {
+  display: flex;
+  padding: 0 20px;
+  border-bottom: 1px solid #2d333b;
+}
+
+.color-mode-tab {
+  flex: 1;
+  text-align: center;
+  padding: 12px 0;
+  font-size: 14px;
+  color: #a9b1ba;
+  cursor: pointer;
+  position: relative;
+}
+
+.color-mode-tab.active {
+  color: #2f81f7;
+  font-weight: 600;
+}
+
+.color-mode-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #2f81f7;
+}
+
+.color-picker-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #eaecef;
+}
+
+.color-picker-close {
+  font-size: 28px;
+  color: #a9b1ba;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.color-picker-body {
+  flex: 1;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.color-mode-content {
+  height: 100%;
+}
+
+.color-grid-container {
+  height: 320px;
+  margin-bottom: 16px;
+}
+
+.color-grid-row {
+  display: flex;
+  margin-bottom: 4px;
+  gap: 4px;
+}
+
+.color-grid-item {
+  flex: 1;
+  height: 28px;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.color-grid-item.selected {
+  border-color: #2f81f7;
+  box-shadow: 0 0 0 2px rgba(47, 129, 247, 0.3);
+}
+
+.color-grid-item:active {
+  opacity: 0.8;
+}
+
+.color-preview-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #0f1320;
+  border-radius: 8px;
+}
+
+.color-preview-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: 2px solid #2d333b;
+}
+
+.color-preview-text {
+  font-size: 14px;
+  color: #eaecef;
+  font-family: monospace;
+}
+
+.color-picker-footer {
+  display: flex;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #2d333b;
+}
+
+.color-picker-footer .btn {
+  flex: 1;
+}
+
+/* 滑块模式 */
+.slider-section {
+  padding: 16px 0;
+}
+
+.slider-item {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slider-label {
+  font-size: 13px;
+  color: #a9b1ba;
+  min-width: 70px;
+}
+
+.color-slider {
+  flex: 1;
+}
+
+.slider-value {
+  font-size: 13px;
+  color: #eaecef;
+  min-width: 45px;
+  text-align: right;
+  font-family: monospace;
+}
+
+/* 联系方式样式 - 低调版本 */
+.contact-section {
+  margin-top: auto;
+  margin-bottom: 75rpx; /* 距离底部约1cm */
+  padding: 8px 0;
+  text-align: center;
+  width: 100%;
+}
+
+.contact-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.contact-label {
+  color: #8b949e;
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.contact-email {
+  color: #a9b1ba;
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.contact-note {
+  color: #6e7681;
+  font-size: 11px;
+  font-style: normal;
+}

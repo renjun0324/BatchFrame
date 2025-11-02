@@ -1,7 +1,7 @@
 # 📸 批量边框助手
 
 <div align="center">
-  <img src="assets/logo.png" alt="Logo" width="120" />
+  <img src="png/logo.png" alt="Logo" width="120" />
   <p><b>一键为照片添加专业边框，轻松打造相册质感</b></p>
 </div>
 

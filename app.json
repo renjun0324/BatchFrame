@@ -1,0 +1,19 @@
+{
+    "pages": [
+      "pages/home/home",
+      "pages/frame/frame",
+      "pages/index/index"
+    ],
+    "window": {
+      "navigationBarTitleText": "批量边框助手",
+      "navigationBarBackgroundColor": "#111111",
+      "navigationBarTextStyle": "white",
+      "backgroundTextStyle": "dark",
+      "backgroundColor": "#0f1115"
+    },
+    "permission": {
+      "scope.writePhotosAlbum": {
+        "desc": "用于保存处理后的图片到相册"
+      }
+    }
+  }

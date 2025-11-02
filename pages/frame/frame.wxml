@@ -1,0 +1,236 @@
+<view class="page">
+  <!-- 顶部操作栏 -->
+  <view class="top-bar">
+    <button class="btn primary" bindtap="chooseImages">选择照片</button>
+    <view class="export-info" wx:if="{{images.length > 0}}">
+      <text>已选择 {{images.length}} 张</text>
+    </view>
+  </view>
+
+  <!-- 主要编辑区域 -->
+  <view class="main-panel">
+    <!-- 预览区域 -->
+    <view class="preview-section">
+      <view class="preview-card">
+        <canvas type="2d" id="preview"
+                style="width: 300px; height: {{displayHeight}}px; background: {{canvasBg}};"
+                width="{{previewW}}" height="{{previewH}}"></canvas>
+        <view class="preview-badge">{{zoomPct}}%</view>
+      </view>
+      
+      <!-- 缩略图 -->
+      <scroll-view class="thumbnail-list" scroll-x wx:if="{{images.length > 0}}">
+        <image wx:for="{{images}}" wx:key="*this" src="{{item}}"
+               class="thumbnail {{index===curIndex?'active':''}}"
+               mode="aspectFit"
+               bindtap="onPickIndex" data-idx="{{index}}"/>
+      </scroll-view>
+    </view>
+
+    <!-- 设置面板 -->
+    <view class="settings-panel">
+      <!-- 比例选择 -->
+      <view class="setting-group">
+        <view class="setting-label">画面比例</view>
+        <scroll-view class="ratio-chips" scroll-x>
+          <view class="ratio-chip {{ratioIdx===index?'active':''}}"
+                wx:for="{{ratioOptions}}" wx:key="*this" data-idx="{{index}}" bindtap="onRatioChip">
+            {{item}}
+          </view>
+        </scroll-view>
+      </view>
+
+      <!-- 尺寸和方向 -->
+      <view class="setting-group">
+        <view class="setting-label">导出设置</view>
+        <view class="export-settings">
+          <picker mode="selector" range="{{sizePresets}}" value="{{sizeIdx}}" bindchange="onSizePick">
+            <view class="export-setting-item">
+              <text class="label">长边尺寸</text>
+              <text class="value">{{sizePresets[sizeIdx]}}px</text>
+            </view>
+          </picker>
+          <view class="export-setting-item" bindtap="toggleOrientation">
+            <text class="label">方向</text>
+            <text class="value">{{isLandscape?'横向':'纵向'}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 边框和缩放设置 -->
+      <view class="setting-group">
+        <view class="setting-label">边框设置</view>
+        <view class="border-settings">
+          <view class="border-setting">
+            <text class="label">边框宽度</text>
+            <view class="controls">
+              <button size="mini" class="btn ghost" bindtap="decBorder">－</button>
+              <input class="input" type="digit" value="{{borderPx}}" bindinput="onBorderInput" bindblur="onBorderBlur" hold-keyboard="{{true}}"/>
+              <button size="mini" class="btn ghost" bindtap="incBorder">＋</button>
+            </view>
+          </view>
+          <view class="border-setting">
+            <text class="label">图片缩放</text>
+            <view class="controls">
+              <button size="mini" class="btn ghost" bindtap="decZoom">－</button>
+              <input class="input" type="digit" value="{{zoomPct}}" bindinput="onZoomInput" bindblur="onZoomBlur" hold-keyboard="{{true}}"/>
+              <button size="mini" class="btn ghost" bindtap="incZoom">＋</button>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 颜色设置 -->
+      <view class="setting-group">
+        <view class="setting-label">颜色设置</view>
+        <view class="color-settings">
+          <view class="color-setting">
+            <view class="color-label">
+              <text>外部背景</text>
+              <switch checked="{{enableOuterBg}}" bindchange="toggleOuterBg" color="#2f81f7"/>
+            </view>
+            <view class="color-options" wx:if="{{enableOuterBg}}">
+              <view class="color-item {{outerBgColor===color?'active':''}}" 
+                    wx:for="{{colorPresets}}" wx:key="*this" wx:for-item="color"
+                    style="background:{{color}}"
+                    data-color="{{color}}"
+                    bindtap="selectOuterColor">
+              </view>
+              <view class="color-item custom-color" bindtap="openColorPicker" data-type="outer">
+                <text class="custom-color-text">+</text>
+              </view>
+            </view>
+          </view>
+          
+          <view class="color-setting">
+            <view class="color-label">
+              <text>边框颜色</text>
+              <switch checked="{{enableInnerBorder}}" bindchange="toggleInnerBorder" color="#2f81f7"/>
+            </view>
+            <view class="color-options" wx:if="{{enableInnerBorder}}">
+              <view class="color-item {{innerBorderColor===color?'active':''}}" 
+                    wx:for="{{colorPresets}}" wx:key="*this" wx:for-item="color"
+                    style="background:{{color}}"
+                    data-color="{{color}}"
+                    bindtap="selectInnerColor">
+              </view>
+              <view class="color-item custom-color" bindtap="openColorPicker" data-type="inner">
+                <text class="custom-color-text">+</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部操作按钮 -->
+  <view class="bottom-actions" wx:if="{{images.length > 0}}">
+    <button class="btn large-primary" bindtap="exportAll" disabled="{{exporting}}">
+      <text wx:if="{{exporting}}">处理中... {{progressCur}}/{{progressTotal}}</text>
+      <text wx:else>批量导出 ({{images.length}}张)</text>
+    </button>
+  </view>
+
+  <!-- 颜色选择器弹窗 -->
+  <view class="color-picker-modal" wx:if="{{showColorPicker}}">
+    <view class="color-picker-mask" bindtap="closeColorPicker"></view>
+    <view class="color-picker-content">
+      <view class="color-picker-header">
+        <text class="color-picker-title">选择颜色</text>
+        <view class="color-picker-close" bindtap="closeColorPicker">×</view>
+      </view>
+      
+      <!-- 模式切换标签 -->
+      <view class="color-mode-tabs">
+        <view class="color-mode-tab {{colorPickerMode==='spectrum'?'active':''}}" 
+              data-mode="spectrum" bindtap="switchColorMode">光谱</view>
+        <view class="color-mode-tab {{colorPickerMode==='slider'?'active':''}}" 
+              data-mode="slider" bindtap="switchColorMode">滑块</view>
+        <view class="color-mode-tab {{colorPickerMode==='rgb'?'active':''}}" 
+              data-mode="rgb" bindtap="switchColorMode">RGB</view>
+      </view>
+      
+      <view class="color-picker-body">
+        <!-- 光谱模式 -->
+        <view wx:if="{{colorPickerMode==='spectrum'}}" class="color-mode-content">
+          <scroll-view scroll-y class="color-grid-container">
+            <view class="color-grid-row" wx:for="{{colorGridData}}" wx:key="index">
+              <view class="color-grid-item {{currentPickerColor===color?'selected':''}}"
+                    wx:for="{{item}}" wx:key="*this" wx:for-item="color"
+                    style="background:{{color}}"
+                    data-color="{{color}}"
+                    bindtap="selectColorFromGrid">
+              </view>
+            </view>
+          </scroll-view>
+        </view>
+        
+        <!-- 滑块模式 -->
+        <view wx:if="{{colorPickerMode==='slider'}}" class="color-mode-content">
+          <view class="slider-section">
+            <view class="slider-item">
+              <text class="slider-label">色相</text>
+              <slider class="color-slider" min="0" max="360" value="{{hue}}" 
+                      backgroundColor="#ddd" activeColor="#ff0000" 
+                      bindchange="onHueChange" block-size="20"/>
+              <text class="slider-value">{{hue}}°</text>
+            </view>
+            <view class="slider-item">
+              <text class="slider-label">饱和度</text>
+              <slider class="color-slider" min="0" max="100" value="{{saturation}}" 
+                      backgroundColor="#ddd" activeColor="#00ff00" 
+                      bindchange="onSaturationChange" block-size="20"/>
+              <text class="slider-value">{{saturation}}%</text>
+            </view>
+            <view class="slider-item">
+              <text class="slider-label">亮度</text>
+              <slider class="color-slider" min="0" max="100" value="{{lightness}}" 
+                      backgroundColor="#ddd" activeColor="#0000ff" 
+                      bindchange="onLightnessChange" block-size="20"/>
+              <text class="slider-value">{{lightness}}%</text>
+            </view>
+          </view>
+        </view>
+        
+        <!-- RGB模式 -->
+        <view wx:if="{{colorPickerMode==='rgb'}}" class="color-mode-content">
+          <view class="slider-section">
+            <view class="slider-item">
+              <text class="slider-label">红色 (R)</text>
+              <slider class="color-slider" min="0" max="255" value="{{red}}" 
+                      backgroundColor="#ddd" activeColor="#ff0000" 
+                      bindchange="onRedChange" block-size="20"/>
+              <text class="slider-value">{{red}}</text>
+            </view>
+            <view class="slider-item">
+              <text class="slider-label">绿色 (G)</text>
+              <slider class="color-slider" min="0" max="255" value="{{green}}" 
+                      backgroundColor="#ddd" activeColor="#00ff00" 
+                      bindchange="onGreenChange" block-size="20"/>
+              <text class="slider-value">{{green}}</text>
+            </view>
+            <view class="slider-item">
+              <text class="slider-label">蓝色 (B)</text>
+              <slider class="color-slider" min="0" max="255" value="{{blue}}" 
+                      backgroundColor="#ddd" activeColor="#0000ff" 
+                      bindchange="onBlueChange" block-size="20"/>
+              <text class="slider-value">{{blue}}</text>
+            </view>
+          </view>
+        </view>
+        
+        <!-- 当前选中颜色预览 -->
+        <view class="color-preview-section">
+          <view class="color-preview-box" style="background:{{currentPickerColor}}"></view>
+          <text class="color-preview-text">{{currentPickerColor}}</text>
+        </view>
+      </view>
+      
+      <view class="color-picker-footer">
+        <button class="btn ghost" size="default" bindtap="closeColorPicker">取消</button>
+        <button class="btn primary" size="default" bindtap="confirmColorPicker">确定</button>
+      </view>
+    </view>
+  </view>
+</view>
