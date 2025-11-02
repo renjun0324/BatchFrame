@@ -31,7 +31,7 @@
 ## 🖼️ 示例界面
 
 <div align="center">
-  <img src="png/1.png" alt="示例图1" width="250"/>
+  <img src="png/1.jpg" alt="示例图1" width="250"/>
 </div>
 
 > ✨ 照片加边框效果示例（黑白边框）
