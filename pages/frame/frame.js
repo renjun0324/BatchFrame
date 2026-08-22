@@ -1,4 +1,5 @@
-const sys = wx.getSystemInfoSync();
+const contentSecurity = require('../../utils/contentSecurity.js');
+const sys = wx.getWindowInfo();
 const DPR = sys.pixelRatio || 1;
 
 function parseRatio(str){
@@ -29,6 +30,11 @@ Page({
     outerBgColor: '#FFFFFF',    // 外部背景颜色
     enableInnerBorder: true,    // 是否显示内部边框
     innerBorderColor: '#000000', // 内部边框颜色
+
+    // 后台异步检测状态
+    isChecking: false,          // 是否正在检测
+    checkingProgress: 0,        // 检测进度
+    checkingTotal: 0,           // 总数
     
     // 颜色预设：黑色、灰色、白色 + 三个常用颜色
     colorPresets: ['#000000', '#666666', '#FFFFFF', '#FF6B6B', '#4ECDC4', '#45B7D1'],
@@ -111,30 +117,63 @@ Page({
   // 选择与导航
   chooseImages(){
     wx.chooseImage({
-      count:20, sizeType:['original'], sourceType:['album','camera'],
-      success:(res)=>{
+      count:9, sizeType:['original'], sourceType:['album','camera'],
+      success: (res)=>{
         const paths = res.tempFilePaths || res.tempFiles?.map(f=>f.tempFilePath) || [];
-        console.log(`选择的图片路径: ${paths.length} 张`, paths);
-        
-        // 立即获取第一张图片的信息来检查长宽比
-        if(paths.length > 0) {
-          wx.getImageInfo({
-            src: paths[0],
-            success: (info) => {
-              console.log(`第一张图片实际尺寸: ${info.width}x${info.height}, 原始比例: ${(info.width/info.height).toFixed(4)}`);
-            }
-          });
-        }
-        
-        this.setData({ images: paths, curIndex:0 }, ()=>{
-          // 分析第一张图片的主色调
-          if(paths.length > 0){
-            this.extractMainColors(paths[0]);
-          }
-          this.updatePreviewSize().then(()=> this.redrawPreview());
+        if(paths.length === 0) return;
+        const checkId = (this._securityCheckId || 0) + 1;
+        this._securityCheckId = checkId;
+        this.setData({
+          images: [],
+          curIndex: 0,
+          isChecking: true,
+          checkingProgress: 0,
+          checkingTotal: paths.length
         });
+        wx.showLoading({ title: '正在安全检测…', mask: true });
+        this.backgroundCheckImages(paths, checkId);
       }
     });
+  },
+
+  // 只有明确通过安全检测的图片才会进入编辑列表。
+  async backgroundCheckImages(paths, checkId) {
+    try {
+      const checkResult = await contentSecurity.checkMultipleImages(
+        paths,
+        (current, total) => {
+          if (this._securityCheckId !== checkId) return;
+          this.setData({
+            checkingProgress: current,
+            checkingTotal: total
+          });
+        }
+      );
+      if (this._securityCheckId !== checkId) return;
+      wx.hideLoading();
+      this.setData({ isChecking: false });
+      const safePaths = checkResult.results.filter(r => r.status === 'passed').map(r => r.path);
+      const rejected = checkResult.results.filter(r => r.status === 'rejected').length;
+      const errors = checkResult.results.filter(r => r.status === 'error').length;
+      if (safePaths.length) {
+        this.setData({ images: safePaths, curIndex: 0 }, () => {
+          this.extractMainColors(safePaths[0]);
+          this.updatePreviewSize().then(() => this.redrawPreview());
+        });
+      }
+      if (!safePaths.length || rejected || errors) {
+        const detail = safePaths.length
+          ? `已导入 ${safePaths.length} 张通过检测的图片；${rejected} 张未通过，${errors} 张检测异常，均未导入。`
+          : `未导入图片：${rejected} 张未通过内容安全检测，${errors} 张检测异常。请稍后重试。`;
+        wx.showModal({ title: '内容安全提示', content: detail, showCancel: false });
+      }
+    } catch (err) {
+      if (this._securityCheckId !== checkId) return;
+      wx.hideLoading();
+      console.error('后台检测失败:', err);
+      this.setData({ images: [], curIndex: 0, isChecking: false });
+      wx.showModal({ title: '内容安全提示', content: '内容安全检测未完成，本次图片不能使用，请稍后重试。', showCancel: false });
+    }
   },
   onPickIndex(e){ 
     const idx = +e.currentTarget.dataset.idx || 0; 
@@ -715,6 +754,10 @@ Page({
   // 批量导出（按当前参数）
   async exportAll(){
     const list = this.data.images;
+    if(this.data.isChecking){
+      wx.showToast({ title: '请等待内容安全检测完成', icon: 'none' });
+      return;
+    }
     if(!list.length || this.data.exporting) return;
 
     try{
@@ -913,39 +956,119 @@ Page({
     img.src = imagePath;
   },
 
-  ensureAlbumPermission(){
-    return new Promise((resolve, reject)=>{
+  // 检查相册权限状态
+  checkAlbumPermission(){
+    return new Promise((resolve, reject) => {
       wx.getSetting({
-        success:(res)=>{
+        success: (res) => {
           const scope = res.authSetting['scope.writePhotosAlbum'];
-          if(scope === true) return resolve();
-          if(scope === undefined){
-            wx.authorize({
-              scope:'scope.writePhotosAlbum',
-              success:()=>resolve(),
-              fail:()=>reject(new Error('authDenied'))
-            });
-            return;
-          }
-          wx.showModal({
-            title:'需要开启权限',
-            content:'保存图片需要开启相册访问权限，请在设置中授权。',
-            confirmText:'去设置',
-            success:(modalRes)=>{
-              if(!modalRes.confirm){ reject(new Error('authDenied')); return; }
-              wx.openSetting({
-                success:(setting)=>{
-                  if(setting.authSetting['scope.writePhotosAlbum']) resolve();
-                  else reject(new Error('authDenied'));
-                },
-                fail:()=>reject(new Error('openSettingFail'))
-              });
-            },
-            fail:()=>reject(new Error('modalFail'))
-          });
+          resolve(scope);
         },
-        fail:()=>reject(new Error('getSettingFail'))
+        fail: () => reject(new Error('getSettingFail'))
       });
+    });
+  },
+
+  // 使用按钮触发权限请求（推荐方式）
+  requestAlbumPermission(){
+    return new Promise((resolve, reject) => {
+      wx.authorize({
+        scope: 'scope.writePhotosAlbum',
+        success: () => {
+          console.log('相册权限授权成功');
+          resolve(true);
+        },
+        fail: (err) => {
+          console.log('相册权限授权失败', err);
+          // 如果用户拒绝，记录状态但不立即引导去设置
+          resolve(false);
+        }
+      });
+    });
+  },
+
+  // 引导用户去设置页开启权限
+  guideToOpenSetting(){
+    return new Promise((resolve, reject) => {
+      wx.showModal({
+        title: '需要相册权限',
+        content: '保存图片到相册需要您的授权，请前往设置开启相册权限。',
+        confirmText: '去设置',
+        cancelText: '取消',
+        success: (res) => {
+          if (res.confirm) {
+            wx.openSetting({
+              success: (settingRes) => {
+                if (settingRes.authSetting['scope.writePhotosAlbum']) {
+                  resolve(true);
+                } else {
+                  resolve(false);
+                }
+              },
+              fail: () => reject(new Error('openSettingFail'))
+            });
+          } else {
+            resolve(false);
+          }
+        },
+        fail: () => reject(new Error('modalFail'))
+      });
+    });
+  },
+
+  // 优化的权限获取流程
+  ensureAlbumPermission(){
+    return new Promise(async (resolve, reject) => {
+      try {
+        // 1. 先检查当前权限状态
+        const permissionStatus = await this.checkAlbumPermission();
+
+        if (permissionStatus === true) {
+          // 已经授权，直接通过
+          resolve();
+          return;
+        }
+
+        if (permissionStatus === false) {
+          // 用户之前拒绝过，引导去设置页
+          const settingResult = await this.guideToOpenSetting();
+          if (settingResult) {
+            resolve();
+          } else {
+            reject(new Error('authDenied'));
+          }
+          return;
+        }
+
+        // 权限状态为undefined，首次使用，使用按钮触发授权
+        // 这里我们直接调用authorize，因为用户点击了导出按钮
+        const authResult = await this.requestAlbumPermission();
+        if (authResult) {
+          resolve();
+        } else {
+          // 用户拒绝授权，提供友好提示但不强制跳转设置
+          wx.showToast({
+            title: '未获得相册权限',
+            icon: 'none',
+            duration: 2000
+          });
+          reject(new Error('authDenied'));
+        }
+      } catch (error) {
+        console.error('权限检查失败', error);
+        reject(error);
+      }
+    });
+  },
+
+  // 在用户首次使用保存功能时请求权限（可选方案）
+  preRequestPermission(){
+    // 可以在页面加载时或用户首次进入时调用
+    this.checkAlbumPermission().then(status => {
+      if (status === undefined) {
+        // 首次使用，可以显示权限说明但不立即请求
+        console.log('首次使用，可以显示权限引导');
+      }
     });
   }
 });

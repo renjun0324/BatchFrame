@@ -98,7 +98,7 @@
 
     <!-- 执行 -->
     <view class="row actions">
-      <button class="btn primary" bindtap="exportAll" disabled="{{images.length===0 || exporting}}">
+      <button class="btn primary" bindtap="exportAll" disabled="{{images.length===0 || exporting || isChecking}}">
         批量导出并保存 ({{images.length}} 张)
       </button>
       <text wx:if="{{exporting}}">进度：{{progressCur}} / {{progressTotal}}</text>

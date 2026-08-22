@@ -4,6 +4,9 @@
     <button class="btn primary" bindtap="chooseImages">选择照片</button>
     <view class="export-info" wx:if="{{images.length > 0}}">
       <text>已选择 {{images.length}} 张</text>
+      <view class="checking-badge" wx:if="{{isChecking}}">
+        <text class="checking-text">🔍 检测中 {{checkingProgress}}/{{checkingTotal}}</text>
+      </view>
     </view>
   </view>
 
@@ -126,7 +129,7 @@
 
   <!-- 底部操作按钮 -->
   <view class="bottom-actions" wx:if="{{images.length > 0}}">
-    <button class="btn large-primary" bindtap="exportAll" disabled="{{exporting}}">
+    <button class="btn large-primary" bindtap="exportAll" disabled="{{exporting || isChecking}}">
       <text wx:if="{{exporting}}">处理中... {{progressCur}}/{{progressTotal}}</text>
       <text wx:else>批量导出 ({{images.length}}张)</text>
     </button>
