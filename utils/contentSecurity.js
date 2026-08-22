@@ -63,17 +63,32 @@ async function checkSingleImage(tempFilePath) {
       };
     }
 
-    const uploadResult = await withTimeout(wx.cloud.uploadFile({
-      cloudPath: `temp-check/${Date.now()}-${Math.random().toString(36).slice(2)}.${contentType.split('/')[1]}`,
-      filePath: tempFilePath
-    }), 30000);
+    let data;
 
-    fileID = uploadResult && uploadResult.fileID;
-    if (!fileID) throw new Error('图片上传失败');
+    // CDN 方式避免“上传云存储→云函数下载→删除”的额外往返。
+    // 旧版基础库没有 wx.cloud.CDN 时，保留云存储方式作为兼容回退。
+    if (typeof wx.cloud.CDN === 'function') {
+      data = {
+        imgUrl: wx.cloud.CDN({
+          type: 'filePath',
+          filePath: tempFilePath
+        }),
+        contentType
+      };
+    } else {
+      const uploadResult = await withTimeout(wx.cloud.uploadFile({
+        cloudPath: `temp-check/${Date.now()}-${Math.random().toString(36).slice(2)}.${contentType.split('/')[1]}`,
+        filePath: tempFilePath
+      }), 30000);
+
+      fileID = uploadResult && uploadResult.fileID;
+      if (!fileID) throw new Error('图片上传失败');
+      data = { fileID, contentType };
+    }
 
     const response = await withTimeout(wx.cloud.callFunction({
       name: 'checkImage',
-      data: { fileID, contentType }
+      data
     }), 30000);
     const result = response && response.result;
 

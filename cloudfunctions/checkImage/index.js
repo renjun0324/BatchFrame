@@ -1,9 +1,76 @@
 // 云函数：检查图片内容安全
 const cloud = require('wx-server-sdk')
+const http = require('http')
+const https = require('https')
+const net = require('net')
 
 cloud.init({
   env: cloud.DYNAMIC_CURRENT_ENV
 })
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+const ALLOWED_CDN_HOST = /(^|\.)((tcb\.qcloud\.la)|(tcloudbaseapp\.com)|(tcloudbasegateway\.com)|(qcloud\.com)|(myqcloud\.com))$/i
+
+function downloadImageUrl(rawUrl, redirectCount = 0) {
+  return new Promise((resolve, reject) => {
+    let parsed
+    try {
+      parsed = new URL(rawUrl)
+    } catch (err) {
+      reject(new Error('图片地址无效'))
+      return
+    }
+
+    const host = parsed.hostname.toLowerCase()
+    if (!['http:', 'https:'].includes(parsed.protocol) || net.isIP(host) || !ALLOWED_CDN_HOST.test(host)) {
+      reject(new Error('图片地址不是受信任的临时 CDN 地址'))
+      return
+    }
+    if (redirectCount > 2) {
+      reject(new Error('图片地址重定向次数过多'))
+      return
+    }
+
+    const transport = parsed.protocol === 'https:' ? https : http
+    const request = transport.get(parsed, { headers: { Accept: 'image/*' } }, response => {
+      if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+        response.resume()
+        downloadImageUrl(new URL(response.headers.location, parsed).toString(), redirectCount + 1)
+          .then(resolve)
+          .catch(reject)
+        return
+      }
+      if (response.statusCode !== 200) {
+        response.resume()
+        reject(new Error(`临时 CDN 返回 HTTP ${response.statusCode}`))
+        return
+      }
+
+      const declaredLength = Number(response.headers['content-length'] || 0)
+      if (declaredLength > MAX_IMAGE_BYTES) {
+        response.resume()
+        reject(new Error('图片超过 10MB 限制'))
+        return
+      }
+
+      const chunks = []
+      let total = 0
+      response.on('data', chunk => {
+        total += chunk.length
+        if (total > MAX_IMAGE_BYTES) {
+          request.destroy()
+          reject(new Error('图片超过 10MB 限制'))
+          return
+        }
+        chunks.push(chunk)
+      })
+      response.on('end', () => resolve(Buffer.concat(chunks)))
+      response.on('error', reject)
+    })
+    request.setTimeout(8000, () => request.destroy(new Error('下载图片超时')))
+    request.on('error', reject)
+  })
+}
 
 exports.main = async (event, context) => {
   const wxContext = cloud.getWXContext()
@@ -40,12 +107,9 @@ exports.main = async (event, context) => {
       const downloadTime = Date.now() - downloadStartTime
       console.log(`步骤1完成：图片下载成功，耗时 ${downloadTime}ms，大小 ${imgBuffer.length} bytes`)
     } else if (imgUrl) {
-      console.error('错误：不支持临时文件路径')
-      return {
-        success: false,
-        errCode: -2,
-        errMsg: '暂不支持临时文件路径，请先上传到云存储'
-      }
+      console.log('步骤1：从临时 CDN 下载图片...')
+      imgBuffer = await downloadImageUrl(imgUrl)
+      console.log(`步骤1完成：图片下载成功，大小 ${imgBuffer.length} bytes`)
     }
 
     // 调用内容安全检测API
