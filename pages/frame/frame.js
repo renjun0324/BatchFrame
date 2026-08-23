@@ -104,6 +104,8 @@ Page({
     this.pendingRender = false;
     if (this._canvasRetryTimer) clearTimeout(this._canvasRetryTimer);
     if (this._redrawTimer) clearTimeout(this._redrawTimer);
+    if (this.borderTimer) clearTimeout(this.borderTimer);
+    if (this.zoomTimer) clearTimeout(this.zoomTimer);
     this._renderToken = (this._renderToken || 0) + 1;
     this._imageCache = Object.create(null);
     this._imageCacheOrder = [];
