@@ -42,6 +42,17 @@ Page({
     innerFrameStyles: INNER_FRAME_STYLES,
     edgeStrengthLevel: 'medium',
     edgeStrengthOptions: EDGE_STRENGTHS,
+    activeTool: 'template',
+    toolOptions: ['template', 'canvas', 'frame', 'image'],
+    panelExpanded: true,
+    panelScrollTop: 0,
+    templates: [
+      { id: 'white-clean', name: '白底经典', outerBgColor: '#FFFFFF', styleId: 'clean-black', enableOuterBg: true },
+      { id: 'white-scan', name: '白底暗房', outerBgColor: '#FFFFFF', styleId: 'darkroom-scan', enableOuterBg: true },
+      { id: 'white-rough', name: '白底粗粝', outerBgColor: '#FFFFFF', styleId: 'rough-emulsion', enableOuterBg: true },
+      { id: 'black-clean', name: '黑底经典', outerBgColor: '#000000', styleId: 'clean-black', enableOuterBg: true },
+      { id: 'white-none', name: '白底无框', outerBgColor: '#FFFFFF', styleId: 'none', enableOuterBg: true }
+    ],
     zoom: 0.95,
     zoomPct: 95,
 
@@ -77,6 +88,7 @@ Page({
 
     previewW: 680,
     previewH: 510,
+    displayWidth: 300,
     displayHeight: 255,
 
     exporting:false, progressCur:0, progressTotal:0,
@@ -90,12 +102,18 @@ Page({
     this._imageCache = Object.create(null);
     this._imageCacheOrder = [];
     this._renderToken = 0;
+    this._frameWidths = { 'clean-black': 8, 'darkroom-scan': 12, 'rough-emulsion': 16 };
     this.canvasReady = false;
     this.imageReady = false;
     this.pendingRender = false;
     this.initPreviewCanvas();
     this.updatePreviewSize();
     this.generateColorGrid();
+    this.measurePreviewViewport();
+    if (wx.onWindowResize) {
+      this._windowResizeHandler = () => this.measurePreviewViewport();
+      wx.onWindowResize(this._windowResizeHandler);
+    }
   },
 
   onUnload(){
@@ -106,6 +124,7 @@ Page({
     if (this._redrawTimer) clearTimeout(this._redrawTimer);
     if (this.borderTimer) clearTimeout(this.borderTimer);
     if (this.zoomTimer) clearTimeout(this.zoomTimer);
+    if (wx.offWindowResize && this._windowResizeHandler) wx.offWindowResize(this._windowResizeHandler);
     this._renderToken = (this._renderToken || 0) + 1;
     this._imageCache = Object.create(null);
     this._imageCacheOrder = [];
@@ -282,6 +301,48 @@ Page({
     });
   },
 
+  onToolTap(e){
+    const tool = e.currentTarget.dataset.tool;
+    if (!tool) return;
+    this.setData({ activeTool: tool, panelExpanded: true, panelScrollTop: 0 });
+  },
+
+  togglePanel(){
+    this.setData({ panelExpanded: !this.data.panelExpanded }, () => this.measurePreviewViewport());
+  },
+
+  measurePreviewViewport(){
+    const query = wx.createSelectorQuery();
+    query.select('.preview-stage').boundingClientRect(rect => {
+      if (!rect || !rect.width || !rect.height) return;
+      const logicalW = Math.max(1, this.data.previewW || 1);
+      const logicalH = Math.max(1, this.data.previewH || 1);
+      const availableWidth = Math.max(120, rect.width - 24);
+      const availableHeight = Math.max(120, rect.height - 24);
+      const scale = Math.min(availableWidth / logicalW, availableHeight / logicalH);
+      this.setData({
+        displayWidth: Math.max(1, Math.floor(logicalW * scale)),
+        displayHeight: Math.max(1, Math.floor(logicalH * scale))
+      });
+    }).exec();
+  },
+
+  onTemplateTap(e){
+    const template = (this.data.templates || []).find(item => item.id === e.currentTarget.dataset.templateId);
+    if (!template) return;
+    const style = getInnerFrameStyle(template.styleId);
+    const width = template.styleId === 'none' ? 0 : (this._frameWidths[template.styleId] || style.widthAt1800);
+    const canvasBg = template.enableOuterBg ? template.outerBgColor : 'transparent';
+    this.setData({
+      outerBgColor: template.outerBgColor,
+      canvasBg,
+      enableOuterBg: template.enableOuterBg,
+      innerFrameStyleId: template.styleId,
+      enableInnerBorder: template.styleId !== 'none',
+      borderPx: width
+    }, this.redrawPreview);
+  },
+
   // 比例/方向/尺寸
   onRatioChip(e){
     const idx = +e.currentTarget.dataset.idx || 0;
@@ -344,6 +405,7 @@ Page({
       return new Promise(resolve=>{
         this.setData({ previewW:baseW, previewH:baseH, displayHeight:dispH }, ()=>{
           this.initPreviewCanvas(true);
+          this.measurePreviewViewport();
           resolve();
         });
       });
@@ -478,9 +540,13 @@ Page({
   onInnerFrameStyleTap(e){
     const styleId = e.currentTarget.dataset.styleId;
     const style = getInnerFrameStyle(styleId);
+    if (this.data.innerFrameStyleId !== 'none' && this.data.innerFrameStyleId) {
+      this._frameWidths[this.data.innerFrameStyleId] = Math.max(0, parseInt(this.data.borderPx, 10) || 0);
+    }
+    const width = style.id === 'none' ? 0 : (this._frameWidths[style.id] || style.widthAt1800);
     this.setData({
       innerFrameStyleId: style.id,
-      borderPx: style.widthAt1800,
+      borderPx: width,
       enableInnerBorder: style.id !== 'none'
     }, this.redrawPreview);
   },
@@ -684,6 +750,9 @@ Page({
 
   applyBorder(v){
     const px = Math.max(0, Math.min(200, parseInt(v,10) || 0));
+    if (this.data.innerFrameStyleId && this.data.innerFrameStyleId !== 'none') {
+      this._frameWidths[this.data.innerFrameStyleId] = px;
+    }
     this.setData({ borderPx: px }, this.redrawPreview);
   },
   applyZoom(v){
