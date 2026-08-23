@@ -1,8 +1,7 @@
 {
     "pages": [
       "pages/home/home",
-      "pages/frame/frame",
-      "pages/index/index"
+      "pages/frame/frame"
     ],
     "window": {
       "navigationBarTitleText": "批量边框助手",

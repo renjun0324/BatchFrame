@@ -1,4 +1,6 @@
 const contentSecurity = require('../../utils/contentSecurity.js');
+const { INNER_FRAME_STYLES, EDGE_STRENGTHS, getInnerFrameStyle } = require('../../core/innerFrameStyles.js');
+const { renderComposite } = require('../../core/compositeRenderer.js');
 const sys = wx.getWindowInfo();
 const DPR = sys.pixelRatio || 1;
 
@@ -15,8 +17,10 @@ function imagePath(image) {
 }
 
 function imageRecord(path, index) {
+  const id = `image-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
   return {
-    id: `image-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+    id,
+    frameSeed: id,
     path,
     securityStatus: 'checking'
   };
@@ -33,7 +37,11 @@ Page({
     sizePresets: ['1200','1800','2400','3000','4000'],
     sizeIdx: 1,
 
-    borderPx: 4,
+    borderPx: 8,
+    innerFrameStyleId: 'clean-black',
+    innerFrameStyles: INNER_FRAME_STYLES,
+    edgeStrengthLevel: 'medium',
+    edgeStrengthOptions: EDGE_STRENGTHS,
     zoom: 0.95,
     zoomPct: 95,
 
@@ -73,14 +81,14 @@ Page({
 
     exporting:false, progressCur:0, progressTotal:0,
 
-    // 图片缓存和性能优化
-    _imageCache: {}, // 图片加载缓存
     _canvasReady: false, // 画布准备状态
     canvasReady: false,
     imageReady: false,
   },
 
   onReady(){
+    this._imageCache = Object.create(null);
+    this._renderToken = 0;
     this.canvasReady = false;
     this.imageReady = false;
     this.pendingRender = false;
@@ -95,6 +103,8 @@ Page({
     this.pendingRender = false;
     if (this._canvasRetryTimer) clearTimeout(this._canvasRetryTimer);
     if (this._redrawTimer) clearTimeout(this._redrawTimer);
+    this._renderToken = (this._renderToken || 0) + 1;
+    this._imageCache = Object.create(null);
     if (this._imageInfoCache) this._imageInfoCache = {};
   },
   
@@ -461,6 +471,20 @@ Page({
     this.applyZoom(current + 1); 
   },
 
+  onInnerFrameStyleTap(e){
+    const styleId = e.currentTarget.dataset.styleId;
+    const style = getInnerFrameStyle(styleId);
+    this.setData({
+      innerFrameStyleId: style.id,
+      borderPx: style.widthAt1800,
+      enableInnerBorder: style.id !== 'none'
+    }, this.redrawPreview);
+  },
+
+  onEdgeStrengthTap(e){
+    this.setData({ edgeStrengthLevel: e.currentTarget.dataset.level }, this.redrawPreview);
+  },
+
   // 外部背景开关
   toggleOuterBg(e){
     const value = !!e.detail.value;
@@ -470,7 +494,13 @@ Page({
   // 内部边框开关
   toggleInnerBorder(e){
     const value = !!e.detail.value;
-    this.setData({ enableInnerBorder: value }, this.redrawPreview);
+    const patch = { enableInnerBorder: value };
+    if (value && this.data.innerFrameStyleId === 'none') {
+      const style = getInnerFrameStyle('clean-black');
+      patch.innerFrameStyleId = style.id;
+      patch.borderPx = style.widthAt1800;
+    }
+    this.setData(patch, this.redrawPreview);
   },
 
   // 选择外部背景颜色
@@ -705,8 +735,10 @@ Page({
       return; 
     }
     
-    const cur = imagePath(this.data.images[this.data.curIndex]);
-    const borderForDraw = this.data.enableInnerBorder ? this.previewBorderForShow(this.data.borderPx) : 0;
+    const currentImage = this.data.images[this.data.curIndex];
+    const cur = imagePath(currentImage);
+    const renderToken = (this._renderToken || 0) + 1;
+    this._renderToken = renderToken;
     
     // 使用防抖避免频繁重绘
     if (this._redrawTimer) {
@@ -719,12 +751,17 @@ Page({
         canvas:this.pCanvas, ctx:this.pCtx,
         outW:this.data.previewW, outH:this.data.previewH,
         imgPath:cur,
-        borderPx:borderForDraw,
+        imageId: currentImage && currentImage.id,
+        imageSeed: currentImage && (currentImage.frameSeed || currentImage.id),
+        renderToken,
+        borderPx:this.data.borderPx,
         zoom:this.data.zoom,
         enableOuterBg: this.data.enableOuterBg,
         outerBgColor: this.data.outerBgColor,
         enableInnerBorder: this.data.enableInnerBorder,
-        innerBorderColor: this.data.innerBorderColor
+        innerBorderColor: this.data.innerBorderColor,
+        innerFrameStyleId: this.data.innerFrameStyleId,
+        edgeStrengthLevel: this.data.edgeStrengthLevel
       });
     }, 50); // 50ms防抖延迟
   },
@@ -744,110 +781,75 @@ Page({
     }
   },
 
-  previewBorderForShow(borderPx){
-    const longOut = parseInt(this.data.sizePresets[this.data.sizeIdx],10) || 1800;
-    const longPrev = this.data.previewW;
-    return Math.max(1, Math.round(borderPx * longPrev / longOut));
-  },
-
-  // 绘制：外部背景→轮廓→内部边框→图片（留安全边距）
-  drawToCanvas({ canvas, ctx, outW, outH, imgPath, borderPx, zoom, enableOuterBg, outerBgColor, enableInnerBorder, innerBorderColor }){
+  // 预览与导出共用的图片加载适配层；实际构图由 core/compositeRenderer 完成。
+  drawToCanvas({
+    canvas,
+    ctx,
+    outW,
+    outH,
+    imgPath,
+    imageId,
+    imageSeed,
+    renderToken,
+    borderPx,
+    zoom,
+    enableOuterBg,
+    outerBgColor,
+    enableInnerBorder,
+    innerBorderColor,
+    innerFrameStyleId,
+    edgeStrengthLevel
+  }){
     return new Promise((resolve)=>{
-      // 清除画布
-      ctx.clearRect(0, 0, outW, outH);
-      
-      if(enableOuterBg){
-        ctx.fillStyle = outerBgColor || '#FFFFFF';
-        ctx.fillRect(0,0,outW,outH);
-        ctx.strokeStyle = '#e5e5e5';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(0.5,0.5,outW-1,outH-1);
-      }
-
-      // 检查图片缓存
-      if (this.data._imageCache && this.data._imageCache[imgPath]) {
-        const cachedImg = this.data._imageCache[imgPath];
+      const isCurrent = () => !renderToken || renderToken === this._renderToken;
+      const draw = image => {
+        if (!isCurrent()) {
+          resolve();
+          return;
+        }
         this.imageReady = true;
         this.setData({ imageReady: true });
-        this.drawImageWithCorrectAspect(cachedImg, ctx, outW, outH, borderPx, zoom, enableInnerBorder, innerBorderColor);
+        renderComposite({
+          ctx,
+          outWidth: outW,
+          outHeight: outH,
+          image,
+          imageId,
+          imageSeed,
+          layoutSettings: { zoom, fit: 'contain', layoutPadding: 18 },
+          outerBackgroundSettings: { enabled: enableOuterBg, color: outerBgColor },
+          innerFrameSettings: {
+            enabled: enableInnerBorder,
+            styleId: innerFrameStyleId,
+            widthAt1800: borderPx,
+            color: innerBorderColor,
+            strengthLevel: edgeStrengthLevel
+          }
+        });
         resolve();
+      };
+
+      if (this._imageCache && this._imageCache[imgPath]) {
+        draw(this._imageCache[imgPath]);
         return;
       }
 
       const img = canvas.createImage();
       img.onload = ()=>{
-        this.imageReady = true;
-        this.setData({ imageReady: true });
-        // 缓存图片
-        if (!this.data._imageCache) {
-          this.data._imageCache = {};
-        }
-        this.data._imageCache[imgPath] = img;
-        
-        this.drawImageWithCorrectAspect(img, ctx, outW, outH, borderPx, zoom, enableInnerBorder, innerBorderColor);
-        resolve();
+        if (this._imageCache) this._imageCache[imgPath] = img;
+        draw(img);
       };
       img.onerror = ()=>{
-        this.imageReady = false;
-        this.setData({ imageReady: false });
-        ctx.fillStyle='#eee';
-        ctx.fillRect(0,0,outW,outH);
+        if (isCurrent()) {
+          this.imageReady = false;
+          this.setData({ imageReady: false });
+          ctx.fillStyle='#eee';
+          ctx.fillRect(0,0,outW,outH);
+        }
         resolve();
       };
       img.src = imgPath;
     });
-  },
-
-  // 正确保持图片长宽比的绘制方法 - 使用标准算法
-  drawImageWithCorrectAspect(img, ctx, outW, outH, borderPx, zoom, enableInnerBorder, innerBorderColor) {
-    const iw = img.width;
-    const ih = img.height;
-    
-    // 计算可用区域（减去边框和边距）
-    const margin = Math.max(borderPx + 6, 18);
-    const availW = Math.max(1, outW - 2 * margin);
-    const availH = Math.max(1, outH - 2 * margin);
-    
-    // 标准保持比例缩放算法
-    // 1. 先计算基于容器的缩放因子
-    const scaleX = availW / iw;
-    const scaleY = availH / ih;
-    const baseScale = Math.min(scaleX, scaleY);
-    
-    // 2. 应用用户缩放因子
-    const finalScale = baseScale * zoom;
-    
-    // 3. 计算最终尺寸
-    let dw = iw * finalScale;
-    let dh = ih * finalScale;
-    
-    // 4. 确保尺寸不超过可用区域（由于zoom可能>1）
-    if (dw > availW || dh > availH) {
-      const adjustScale = Math.min(availW / iw, availH / ih) * zoom;
-      dw = iw * adjustScale;
-      dh = ih * adjustScale;
-    }
-    
-    // 确保最小尺寸
-    dw = Math.max(1, Math.floor(dw));
-    dh = Math.max(1, Math.floor(dh));
-    
-    const x = Math.floor((outW - dw) / 2);
-    const y = Math.floor((outH - dh) / 2);
-    
-    // 绘制边框
-    if (enableInnerBorder && borderPx > 0) {
-      ctx.fillStyle = innerBorderColor || '#000000';
-      ctx.fillRect(x - borderPx, y - borderPx, dw + 2 * borderPx, dh + 2 * borderPx);
-    }
-    
-    // 绘制图片
-    ctx.drawImage(img, x, y, dw, dh);
-    
-    // 详细的调试信息
-    console.log(`图片原始尺寸: ${iw}x${ih}, 可用区域: ${availW}x${availH}`);
-    console.log(`基础缩放: ${baseScale.toFixed(4)}, 最终缩放: ${finalScale.toFixed(4)}, 用户缩放: ${zoom}`);
-    console.log(`显示尺寸: ${dw}x${dh}, 位置: ${x},${y}, 比例保持: ${(dw/dh).toFixed(4)} vs 原始: ${(iw/ih).toFixed(4)}`);
   },
 
   // 批量导出（按当前参数）
@@ -865,7 +867,8 @@ Page({
       this._exportSecurityBusy = false;
       return;
     }
-    const list = this.data.images.map(imagePath);
+    const imageRecords = this.data.images.slice();
+    const list = imageRecords.map(imagePath);
 
     try{
       await this.ensureAlbumPermission();
@@ -906,18 +909,23 @@ Page({
     let exportFailed = false;
     try{
       for(let i=0;i<list.length;i++){
+        const record = imageRecords[i] || { path: list[i], id: list[i], frameSeed: list[i] };
         await this.drawToCanvas({ 
           canvas: offscreenCanvas, 
           ctx, 
           outW, 
           outH,
           imgPath: list[i], 
+          imageId: record.id,
+          imageSeed: record.frameSeed || record.id || list[i],
           borderPx: this.data.enableInnerBorder ? this.data.borderPx : 0,
           zoom: this.data.zoom,
           enableOuterBg: this.data.enableOuterBg,
           outerBgColor: this.data.outerBgColor,
           enableInnerBorder: this.data.enableInnerBorder,
-          innerBorderColor: this.data.innerBorderColor
+          innerBorderColor: this.data.innerBorderColor,
+          innerFrameStyleId: this.data.innerFrameStyleId,
+          edgeStrengthLevel: this.data.edgeStrengthLevel
         });
 
         await new Promise((resolve)=>{

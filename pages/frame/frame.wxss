@@ -186,6 +186,51 @@
 }
 
 /* 边框设置 */
+.frame-style-options {
+  white-space: nowrap;
+  padding: 2px 0 8px;
+}
+
+.frame-style-option,
+.edge-strength-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  margin-right: 8px;
+  border: 1px solid #2d333b;
+  border-radius: 8px;
+  color: #a9b1ba;
+  background: #141820;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.frame-style-option.active,
+.edge-strength-option.active {
+  color: #fff;
+  border-color: #2f81f7;
+  background: rgba(47,129,247,.18);
+}
+
+.edge-strength-options {
+  display: flex;
+  align-items: center;
+  padding: 2px 0 8px;
+}
+
+.edge-strength-label {
+  color: #a9b1ba;
+  font-size: 12px;
+  margin-right: 8px;
+}
+
+.edge-strength-option {
+  min-width: 42px;
+  margin-right: 6px;
+}
+
 .border-settings {
   display: flex;
   flex-direction: column;

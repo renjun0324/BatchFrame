@@ -64,10 +64,23 @@
 
       <!-- 边框和缩放设置 -->
       <view class="setting-group">
-        <view class="setting-label">边框设置</view>
+        <view class="setting-label">内层边框风格</view>
+        <scroll-view class="frame-style-options" scroll-x>
+          <view wx:for="{{innerFrameStyles}}" wx:key="id"
+                class="frame-style-option {{innerFrameStyleId===item.id?'active':''}}"
+                data-style-id="{{item.id}}" bindtap="onInnerFrameStyleTap">
+            <text>{{item.name}}</text>
+          </view>
+        </scroll-view>
+        <view class="edge-strength-options" wx:if="{{innerFrameStyleId!=='none'}}">
+          <text class="edge-strength-label">边缘强度</text>
+          <view wx:for="{{edgeStrengthOptions}}" wx:key="id"
+                class="edge-strength-option {{edgeStrengthLevel===item.id?'active':''}}"
+                data-level="{{item.id}}" bindtap="onEdgeStrengthTap">{{item.name}}</view>
+        </view>
         <view class="border-settings">
           <view class="border-setting">
-            <text class="label">边框宽度</text>
+            <text class="label">内框宽度</text>
             <view class="controls">
               <button size="mini" class="btn ghost" bindtap="decBorder">－</button>
               <input class="input" type="digit" value="{{borderPx}}" bindinput="onBorderInput" bindblur="onBorderBlur" hold-keyboard="{{true}}"/>
@@ -109,10 +122,10 @@
           
           <view class="color-setting">
             <view class="color-label">
-              <text>边框颜色</text>
+              <text>经典边框颜色</text>
               <switch checked="{{enableInnerBorder}}" bindchange="toggleInnerBorder" color="#2f81f7"/>
             </view>
-            <view class="color-options" wx:if="{{enableInnerBorder}}">
+            <view class="color-options" wx:if="{{enableInnerBorder && innerFrameStyleId==='clean-black'}}">
               <view class="color-item {{innerBorderColor===color?'active':''}}" 
                     wx:for="{{colorPresets}}" wx:key="*this" wx:for-item="color"
                     style="background:{{color}}"
