@@ -88,6 +88,7 @@ Page({
 
   onReady(){
     this._imageCache = Object.create(null);
+    this._imageCacheOrder = [];
     this._renderToken = 0;
     this.canvasReady = false;
     this.imageReady = false;
@@ -105,6 +106,7 @@ Page({
     if (this._redrawTimer) clearTimeout(this._redrawTimer);
     this._renderToken = (this._renderToken || 0) + 1;
     this._imageCache = Object.create(null);
+    this._imageCacheOrder = [];
     if (this._imageInfoCache) this._imageInfoCache = {};
   },
   
@@ -830,13 +832,24 @@ Page({
       };
 
       if (this._imageCache && this._imageCache[imgPath]) {
+        this._imageCacheOrder = (this._imageCacheOrder || []).filter(key => key !== imgPath);
+        this._imageCacheOrder.push(imgPath);
         draw(this._imageCache[imgPath]);
         return;
       }
 
       const img = canvas.createImage();
       img.onload = ()=>{
-        if (this._imageCache) this._imageCache[imgPath] = img;
+        if (this._imageCache) {
+          this._imageCache[imgPath] = img;
+          this._imageCacheOrder = this._imageCacheOrder || [];
+          this._imageCacheOrder = this._imageCacheOrder.filter(key => key !== imgPath);
+          this._imageCacheOrder.push(imgPath);
+          while (this._imageCacheOrder.length > 12) {
+            const expired = this._imageCacheOrder.shift();
+            delete this._imageCache[expired];
+          }
+        }
         draw(img);
       };
       img.onerror = ()=>{

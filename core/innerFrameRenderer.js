@@ -1,6 +1,10 @@
 const { getInnerFrameStyle } = require('./innerFrameStyles');
 const { clamp, getFrameRect } = require('./frameGeometry');
 
+const PROFILE_CACHE_LIMIT = 128;
+const profileCache = Object.create(null);
+const profileCacheOrder = [];
+
 function hashSeed(value) {
   const text = String(value == null ? 'default' : value);
   let hash = 2166136261;
@@ -73,6 +77,22 @@ function generateNormalizedEdgeProfile({
   };
 }
 
+function getCachedNormalizedEdgeProfile(options = {}) {
+  const styleId = options.styleId || 'clean-black';
+  const seed = options.seed == null ? 'default' : options.seed;
+  const strength = options.strength == null ? 1 : options.strength;
+  const pointCount = options.pointCount == null ? 32 : options.pointCount;
+  const key = `${styleId}|${seed}|${strength}|${pointCount}`;
+  if (profileCache[key]) return profileCache[key];
+  const profile = generateNormalizedEdgeProfile({ styleId, seed, strength, pointCount });
+  profileCache[key] = profile;
+  profileCacheOrder.push(key);
+  if (profileCacheOrder.length > PROFILE_CACHE_LIMIT) {
+    delete profileCache[profileCacheOrder.shift()];
+  }
+  return profile;
+}
+
 function edgeValue(profile, side, index) {
   const points = profile[side];
   return points[index] ? points[index].value : 0;
@@ -90,7 +110,7 @@ function buildFramePaths({
   const style = getInnerFrameStyle(styleId);
   if (style.id === 'none' || width <= 0) return null;
 
-  const profile = generateNormalizedEdgeProfile({ styleId, seed, strength, pointCount });
+  const profile = getCachedNormalizedEdgeProfile({ styleId, seed, strength, pointCount });
   const outerVariation = width * (0.25 + style.edgeStrength * 0.8);
   const innerVariation = Math.min(width * 0.28, outerVariation * 0.3);
   const count = profile.top.length;
@@ -243,6 +263,7 @@ module.exports = {
   hashSeed,
   createSeededRandom,
   generateNormalizedEdgeProfile,
+  getCachedNormalizedEdgeProfile,
   buildFramePaths,
   traceSmoothPath,
   drawImageWithInnerFrame
