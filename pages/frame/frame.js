@@ -236,7 +236,9 @@ Page({
     console.info('[content-security] image status', {
       id: this.data.images[index].id,
       path: result.path,
-      status: result.status
+      status: result.status,
+      errCode: result.errCode || null,
+      transport: result.transport || null
     });
   },
 

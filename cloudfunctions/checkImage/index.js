@@ -1,196 +1,280 @@
-// 云函数：检查图片内容安全
+// 云函数：检查图片内容安全。
+// CDN 只接受明确的 HTTPS 云开发域名；客户端在 CDN 传输错误时会使用 fileID 回退。
 const cloud = require('wx-server-sdk')
 const http = require('http')
 const https = require('https')
-const net = require('net')
+const {
+  createTransportError,
+  getSafeHostname,
+  getTrustedCdnSuffixes,
+  validateCdnUrl,
+  validateRedirectCount,
+  validateContentLength
+} = require('./securityTransport')
 
 cloud.init({
   env: cloud.DYNAMIC_CURRENT_ENV
 })
 
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024
-const ALLOWED_CDN_HOST = /(^|\.)((tcb\.qcloud\.la)|(tcloudbaseapp\.com)|(tcloudbasegateway\.com)|(qcloud\.com)|(myqcloud\.com))$/i
+function getErrorCode(error, fallback) {
+  return (error && (error.code || error.errCode)) || fallback
+}
+
+function getErrorMessage(error, fallback) {
+  return (error && (error.message || error.errMsg)) || fallback
+}
+
+function errorResponse(error, transport, startedAt) {
+  const errCode = getErrorCode(error, 'SECURITY_CHECK_ERROR')
+  const response = {
+    success: false,
+    safe: false,
+    status: 'error',
+    errCode,
+    errMsg: getErrorMessage(error, '检测异常'),
+    transport: transport || 'unknown'
+  }
+  if (errCode === 'UNTRUSTED_CDN_HOST' && error && error.cdnHost) {
+    response.cdnHost = error.cdnHost
+  }
+  console.warn('[content-security] failed', {
+    errCode,
+    transport: response.transport,
+    cdnHost: response.cdnHost || null,
+    totalMs: Date.now() - startedAt
+  })
+  return response
+}
+
+function mapDownloadError(error) {
+  if (error && error.code) return error
+  return createTransportError(
+    'CDN_DOWNLOAD_FAILED',
+    getErrorMessage(error, '临时 CDN 图片下载失败')
+  )
+}
 
 function downloadImageUrl(rawUrl, redirectCount = 0) {
+  let parsed
+  try {
+    parsed = validateCdnUrl(rawUrl, getTrustedCdnSuffixes())
+  } catch (error) {
+    return Promise.reject(error)
+  }
+
+  try {
+    validateRedirectCount(redirectCount)
+  } catch (error) {
+    return Promise.reject(error)
+  }
+
   return new Promise((resolve, reject) => {
-    let parsed
-    try {
-      parsed = new URL(rawUrl)
-    } catch (err) {
-      reject(new Error('图片地址无效'))
-      return
+    let settled = false
+    const finish = (error, value) => {
+      if (settled) return
+      settled = true
+      if (error) reject(mapDownloadError(error))
+      else resolve(value)
     }
-
-    const host = parsed.hostname.toLowerCase()
-    if (!['http:', 'https:'].includes(parsed.protocol) || net.isIP(host) || !ALLOWED_CDN_HOST.test(host)) {
-      reject(new Error('图片地址不是受信任的临时 CDN 地址'))
-      return
-    }
-    if (redirectCount > 2) {
-      reject(new Error('图片地址重定向次数过多'))
-      return
-    }
-
     const transport = parsed.protocol === 'https:' ? https : http
-    const request = transport.get(parsed, { headers: { Accept: 'image/*' } }, response => {
-      if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-        response.resume()
-        downloadImageUrl(new URL(response.headers.location, parsed).toString(), redirectCount + 1)
-          .then(resolve)
-          .catch(reject)
-        return
-      }
-      if (response.statusCode !== 200) {
-        response.resume()
-        reject(new Error(`临时 CDN 返回 HTTP ${response.statusCode}`))
-        return
-      }
-
-      const declaredLength = Number(response.headers['content-length'] || 0)
-      if (declaredLength > MAX_IMAGE_BYTES) {
-        response.resume()
-        reject(new Error('图片超过 10MB 限制'))
-        return
-      }
-
-      const chunks = []
-      let total = 0
-      response.on('data', chunk => {
-        total += chunk.length
-        if (total > MAX_IMAGE_BYTES) {
-          request.destroy()
-          reject(new Error('图片超过 10MB 限制'))
+    const request = transport.get(
+      parsed,
+      { headers: { Accept: 'image/*' } },
+      response => {
+        if (
+          response.statusCode >= 300 &&
+          response.statusCode < 400 &&
+          response.headers.location
+        ) {
+          response.resume()
+          if (redirectCount >= MAX_REDIRECTS) {
+            finish(createTransportError(
+              'CDN_TOO_MANY_REDIRECTS',
+              '图片地址重定向次数过多'
+            ))
+            return
+          }
+          let nextUrl
+          try {
+            nextUrl = new URL(response.headers.location, parsed).toString()
+          } catch (error) {
+            finish(createTransportError('INVALID_CDN_URL', '重定向地址无效'))
+            return
+          }
+          downloadImageUrl(nextUrl, redirectCount + 1)
+            .then(value => finish(null, value))
+            .catch(error => finish(error))
           return
         }
-        chunks.push(chunk)
-      })
-      response.on('end', () => resolve(Buffer.concat(chunks)))
-      response.on('error', reject)
+
+        if (response.statusCode !== 200) {
+          response.resume()
+          finish(createTransportError(
+            'CDN_HTTP_ERROR',
+            `临时 CDN 返回 HTTP ${response.statusCode}`,
+            { httpStatus: response.statusCode }
+          ))
+          return
+        }
+
+        try {
+          validateContentLength(response.headers['content-length'])
+        } catch (error) {
+          response.resume()
+          finish(error)
+          return
+        }
+
+        const chunks = []
+        let total = 0
+        response.on('data', chunk => {
+          if (settled) return
+          total += chunk.length
+          if (total > MAX_IMAGE_BYTES) {
+            request.destroy()
+            finish(createTransportError('CDN_TOO_LARGE', '图片超过 10MB 限制'))
+            return
+          }
+          chunks.push(chunk)
+        })
+        response.on('end', () => finish(null, Buffer.concat(chunks)))
+        response.on('error', error => finish(error))
+      }
+    )
+    request.setTimeout(8000, () => {
+      finish(createTransportError('CDN_DOWNLOAD_TIMEOUT', '下载图片超时'))
+      request.destroy()
     })
-    request.setTimeout(8000, () => request.destroy(new Error('下载图片超时')))
-    request.on('error', reject)
+    request.on('error', error => {
+      if (error && error.code === 'ECONNRESET' && settled) return
+      finish(error)
+    })
   })
 }
 
+function safeRequestLog(event) {
+  const imgUrl = event && event.imgUrl
+  return {
+    hasFileID: Boolean(event && event.fileID),
+    hasImgUrl: Boolean(imgUrl),
+    contentType: event && event.contentType || null,
+    cdnHost: imgUrl ? getSafeHostname(imgUrl) : null
+  }
+}
+
 exports.main = async (event, context) => {
-  const wxContext = cloud.getWXContext()
   const startTime = Date.now()
-  
+  const request = event || {}
+  const { fileID, imgUrl, contentType } = request
+  const transport = fileID ? 'file-id' : imgUrl ? 'cdn' : 'unknown'
+  console.info('[content-security] request', safeRequestLog(request))
+
+  if (!fileID && !imgUrl) {
+    return errorResponse(
+      createTransportError('MISSING_IMAGE_INPUT', '缺少图片参数'),
+      transport,
+      startTime
+    )
+  }
+
+  const allowedContentTypes = ['image/jpeg', 'image/png', 'image/gif']
+  if (!allowedContentTypes.includes(contentType)) {
+    return errorResponse(
+      createTransportError('UNSUPPORTED_CONTENT_TYPE', '不支持的图片格式'),
+      transport,
+      startTime
+    )
+  }
+
   try {
-    console.log('=== 开始图片安全检测 ===')
-    console.log('请求参数:', JSON.stringify(event))
-    
-    // 获取图片文件路径或Buffer
-    const { fileID, imgUrl, contentType } = event
-    
-    if (!fileID && !imgUrl) {
-      console.error('错误：缺少图片参数')
-      return {
-        success: false,
-        status: 'error',
-        errCode: -1,
-        errMsg: '缺少图片参数'
-      }
-    }
-
     let imgBuffer
-
-    // 如果传入的是云存储fileID，先下载图片
+    const downloadStartTime = Date.now()
     if (fileID) {
-      console.log('步骤1：下载图片...', fileID)
-      const downloadStartTime = Date.now()
-      
-      const res = await cloud.downloadFile({
-        fileID: fileID,
-      })
-      
+      const res = await cloud.downloadFile({ fileID })
       imgBuffer = res.fileContent
-      const downloadTime = Date.now() - downloadStartTime
-      console.log(`步骤1完成：图片下载成功，耗时 ${downloadTime}ms，大小 ${imgBuffer.length} bytes`)
-    } else if (imgUrl) {
-      console.log('步骤1：从临时 CDN 下载图片...')
+      console.info('[content-security] file-id download', {
+        elapsedMs: Date.now() - downloadStartTime,
+        bytes: imgBuffer && imgBuffer.length || 0
+      })
+    } else {
       imgBuffer = await downloadImageUrl(imgUrl)
-      console.log(`步骤1完成：图片下载成功，大小 ${imgBuffer.length} bytes`)
+      console.info('[content-security] cdn download', {
+        cdnHost: getSafeHostname(imgUrl),
+        elapsedMs: Date.now() - downloadStartTime,
+        bytes: imgBuffer.length
+      })
     }
 
-    // 调用内容安全检测API
-    console.log('步骤2：调用微信安全检测API...')
     const checkStartTime = Date.now()
-    
-    const allowedContentTypes = ['image/jpeg', 'image/png', 'image/gif']
-    if (!allowedContentTypes.includes(contentType)) {
-      return {
-        success: false,
-        status: 'error',
-        errCode: -3,
-        errMsg: '不支持的图片格式'
-      }
-    }
-
     const result = await cloud.openapi.security.imgSecCheck({
       media: {
         contentType,
         value: imgBuffer
       }
     })
-    
-    const checkTime = Date.now() - checkStartTime
-    console.log(`步骤2完成：检测完成，耗时 ${checkTime}ms`)
-    console.log('检测结果详情:', JSON.stringify(result))
+    const checkMs = Date.now() - checkStartTime
+    const resultCode = Number(result && result.errCode)
+    console.info('[content-security] imgSecCheck completed', {
+      transport,
+      checkMs,
+      errCode: result && result.errCode
+    })
 
-    const totalTime = Date.now() - startTime
-    console.log(`=== 总耗时 ${totalTime}ms ===`)
-
-    // 检测结果判断
-    // errCode = 0 表示检测通过
-    // errCode = 87014 表示检测到违规内容
-    if (result.errCode === 0) {
-      console.log('✅ 图片安全')
+    if (resultCode === 0) {
+      console.info('[content-security] completed', {
+        transport,
+        checkMs,
+        totalMs: Date.now() - startTime,
+        status: 'passed'
+      })
       return {
         success: true,
         safe: true,
         status: 'passed',
+        transport,
         message: '图片内容安全'
       }
-    } else if (result.errCode === 87014) {
-      console.warn('⚠️ 检测到违规内容')
+    }
+    if (resultCode === 87014) {
+      console.warn('[content-security] completed', {
+        transport,
+        checkMs,
+        totalMs: Date.now() - startTime,
+        status: 'rejected'
+      })
       return {
         success: true,
         safe: false,
         status: 'rejected',
+        transport,
         message: '图片包含违规内容'
-      }
-    } else {
-      console.error('❌ 检测失败，错误码:', result.errCode)
-      return {
-        success: false,
-        status: 'error',
-        errCode: result.errCode,
-        errMsg: result.errMsg || '检测失败'
       }
     }
 
-  } catch (err) {
-    const totalTime = Date.now() - startTime
-    console.error(`❌ 图片安全检测异常，耗时 ${totalTime}ms`)
-    console.error('错误详情:', err)
-    console.error('错误堆栈:', err.stack)
-
-    // SDK 版本不同可能将明确违规作为异常抛出，仍需保留 rejected 语义。
-    if (Number(err && err.errCode) === 87014) {
+    return errorResponse(
+      createTransportError(
+        result && result.errCode || 'IMG_SEC_CHECK_ERROR',
+        result && result.errMsg || '检测失败'
+      ),
+      transport,
+      startTime
+    )
+  } catch (error) {
+    if (Number(error && (error.errCode || error.code)) === 87014) {
       return {
         success: true,
         safe: false,
         status: 'rejected',
+        transport,
         message: '图片包含违规内容'
       }
     }
-    
-    return {
-      success: false,
-      status: 'error',
-      errCode: err.errCode || -1,
-      errMsg: err.errMsg || err.message || '检测异常'
-    }
+    return errorResponse(error, transport, startTime)
   }
+}
+
+exports._test = {
+  downloadImageUrl,
+  errorResponse,
+  safeRequestLog
 }

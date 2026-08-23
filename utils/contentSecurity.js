@@ -12,6 +12,16 @@ const CONTENT_TYPES = {
   gif: 'image/gif'
 };
 
+const CDN_TRANSPORT_ERRORS = new Set([
+  'UNTRUSTED_CDN_HOST',
+  'INVALID_CDN_URL',
+  'CDN_HTTP_ERROR',
+  'CDN_TOO_LARGE',
+  'CDN_TOO_MANY_REDIRECTS',
+  'CDN_DOWNLOAD_TIMEOUT',
+  'CDN_DOWNLOAD_FAILED'
+]);
+
 function getContentTypeFromPath(filePath) {
   const match = String(filePath || '').split('?')[0].match(/\.([a-zA-Z0-9]+)$/);
   return match ? CONTENT_TYPES[match[1].toLowerCase()] : null;
@@ -41,6 +51,109 @@ function withTimeout(promise, timeoutMs) {
     timer = setTimeout(() => reject(new Error('内容安全检测超时')), timeoutMs);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function getResultErrorCode(result) {
+  return result && (result.errCode || result.code);
+}
+
+function isCdnTransportError(result) {
+  const code = getResultErrorCode(result);
+  return typeof code === 'string' && (
+    CDN_TRANSPORT_ERRORS.has(code) || code.startsWith('CDN_')
+  );
+}
+
+function createResultError(result) {
+  const error = new Error(
+    (result && (result.errMsg || result.message)) ||
+    '内容安全服务返回异常'
+  );
+  error.errCode = getResultErrorCode(result) || 'SECURITY_CHECK_ERROR';
+  error.transport = result && result.transport;
+  error.cdnHost = result && result.cdnHost;
+  return error;
+}
+
+async function callSecurityFunction(data) {
+  const response = await withTimeout(wx.cloud.callFunction({
+    name: 'checkImage',
+    data
+  }), 30000);
+  return response && response.result;
+}
+
+async function uploadReviewCopy(reviewPath, contentType) {
+  if (!wx.cloud || typeof wx.cloud.uploadFile !== 'function') {
+    throw Object.assign(new Error('审核副本上传能力不可用'), {
+      errCode: 'UPLOAD_UNAVAILABLE',
+      transport: 'upload-fallback'
+    });
+  }
+  const extension = contentType === 'image/png' ? 'png' : 'jpg';
+  const uploadResult = await withTimeout(wx.cloud.uploadFile({
+    cloudPath: `temp-check/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`,
+    filePath: reviewPath
+  }), 30000);
+  const fileID = uploadResult && uploadResult.fileID;
+  if (!fileID) {
+    throw Object.assign(new Error('审核副本上传失败'), {
+      errCode: 'UPLOAD_FAILED',
+      transport: 'upload-fallback'
+    });
+  }
+  return fileID;
+}
+
+function normalizeSecurityResult(result, transport) {
+  if (!result || result.success !== true || typeof result.safe !== 'boolean') {
+    throw createResultError(result || {
+      errCode: 'SECURITY_CHECK_ERROR',
+      transport
+    });
+  }
+  const status = result.status || (result.safe ? 'passed' : 'rejected');
+  if (!['passed', 'rejected'].includes(status) ||
+      (status === 'passed') !== result.safe) {
+    throw Object.assign(new Error('内容安全服务状态不一致'), {
+      errCode: 'SECURITY_CHECK_ERROR',
+      transport: result.transport || transport,
+      cdnHost: result.cdnHost
+    });
+  }
+  return {
+    safe: result.safe,
+    status,
+    message: result.message || (result.safe ? '图片内容安全检测通过' : '图片未通过内容安全检测'),
+    errCode: result.errCode,
+    transport: transport || result.transport,
+    cdnHost: result.cdnHost
+  };
+}
+
+async function checkByFileId(reviewPath, contentType) {
+  const uploadStartedAt = Date.now();
+  const fileID = await uploadReviewCopy(reviewPath, contentType);
+  const uploadMs = Date.now() - uploadStartedAt;
+  let result;
+  let checkMs = 0;
+  try {
+    const checkStartedAt = Date.now();
+    result = await callSecurityFunction({ fileID, contentType });
+    checkMs = Date.now() - checkStartedAt;
+    return {
+      result: normalizeSecurityResult(result, 'upload-fallback'),
+      fileID,
+      uploadMs,
+      checkMs
+    };
+  } catch (error) {
+    error.fileID = fileID;
+    error.transport = 'upload-fallback';
+    error.uploadMs = uploadMs;
+    error.checkMs = checkMs;
+    throw error;
+  }
 }
 
 function compressForSecurity(filePath, info) {
@@ -81,84 +194,116 @@ function compressForSecurity(filePath, info) {
  */
 async function checkSingleImage(tempFilePath) {
   let fileID = '';
+  let transport = 'unknown';
+  let reviewCopyMs = 0;
+  let uploadMs = 0;
+  let checkMs = 0;
+  const startedAt = Date.now();
 
   try {
-    if (!wx.cloud || !wx.cloud.uploadFile || !wx.cloud.callFunction) {
+    if (!wx.cloud || !wx.cloud.callFunction) {
       throw new Error('云开发未初始化，无法进行内容安全检测');
     }
 
-    const startedAt = Date.now();
     const info = await withTimeout(getImageInfo(tempFilePath), 10000);
     const contentType = await resolveContentType(tempFilePath, info);
     if (!contentType) {
       return {
         safe: false,
         status: 'error',
+        errCode: 'UNSUPPORTED_CONTENT_TYPE',
+        transport,
         message: '仅支持 JPG、JPEG、PNG 或 GIF 图片'
       };
     }
 
+    const reviewCopyStartedAt = Date.now();
     const reviewPath = await compressForSecurity(tempFilePath, info);
+    reviewCopyMs = Date.now() - reviewCopyStartedAt;
     const reviewContentType = reviewPath === tempFilePath ? contentType : 'image/jpeg';
-    let data;
+    let normalizedResult;
     if (typeof wx.cloud.CDN === 'function') {
-      const imgUrl = wx.cloud.CDN({ type: 'filePath', filePath: reviewPath });
-      if (!imgUrl) throw new Error('审核副本 CDN 地址生成失败');
-      data = { imgUrl, contentType: reviewContentType };
-      console.info('[content-security] using CDN review path', { path: tempFilePath });
+      transport = 'cdn';
+      let cdnResult;
+      try {
+        const imgUrl = wx.cloud.CDN({ type: 'filePath', filePath: reviewPath });
+        if (!imgUrl) {
+          throw Object.assign(new Error('审核副本 CDN 地址生成失败'), {
+            errCode: 'INVALID_CDN_URL',
+            transport: 'cdn'
+          });
+        }
+        const checkStartedAt = Date.now();
+        cdnResult = await callSecurityFunction({
+          imgUrl,
+          contentType: reviewContentType
+        });
+        checkMs = Date.now() - checkStartedAt;
+      } catch (error) {
+        if (!isCdnTransportError(error)) throw error;
+        cdnResult = {
+          success: false,
+          status: 'error',
+          errCode: getResultErrorCode(error),
+          errMsg: error.message,
+          transport: 'cdn',
+          cdnHost: error.cdnHost
+        };
+      }
+
+      if (!isCdnTransportError(cdnResult)) {
+        normalizedResult = normalizeSecurityResult(cdnResult, 'cdn');
+      } else {
+        console.warn('[content-security] CDN transport failed, using upload fallback', {
+          path: tempFilePath,
+          errCode: getResultErrorCode(cdnResult),
+          cdnHost: cdnResult.cdnHost || null
+        });
+        const fallback = await checkByFileId(reviewPath, reviewContentType);
+        fileID = fallback.fileID;
+        normalizedResult = fallback.result;
+        uploadMs = fallback.uploadMs;
+        checkMs = fallback.checkMs;
+        transport = 'upload-fallback';
+      }
     } else {
-      const uploadStartedAt = Date.now();
-      const uploadResult = await withTimeout(wx.cloud.uploadFile({
-        cloudPath: `temp-check/${Date.now()}-${Math.random().toString(36).slice(2)}.${reviewContentType.split('/')[1]}`,
-        filePath: reviewPath
-      }), 30000);
-
-      fileID = uploadResult && uploadResult.fileID;
-      if (!fileID) throw new Error('图片上传失败');
-      data = { fileID, contentType: reviewContentType };
-      console.info('[content-security] upload fallback completed', {
-        path: tempFilePath,
-        uploadMs: Date.now() - uploadStartedAt
-      });
+      transport = 'upload-fallback';
+      const fallback = await checkByFileId(reviewPath, reviewContentType);
+      fileID = fallback.fileID;
+      normalizedResult = fallback.result;
+      uploadMs = fallback.uploadMs;
+      checkMs = fallback.checkMs;
     }
 
-    const checkStartedAt = Date.now();
-    const response = await withTimeout(wx.cloud.callFunction({
-      name: 'checkImage',
-      data
-    }), 30000);
-    const checkMs = Date.now() - checkStartedAt;
-    const result = response && response.result;
-
-    if (!result || result.success !== true || typeof result.safe !== 'boolean') {
-      throw new Error((result && result.errMsg) || '内容安全服务返回异常');
-    }
-
-    const status = result.status || (result.safe ? 'passed' : 'rejected');
-    if (!['passed', 'rejected'].includes(status) || (status === 'passed') !== result.safe) {
-      throw new Error('内容安全服务状态不一致');
-    }
     console.info('[content-security] completed', {
       path: tempFilePath,
+      reviewCopyMs,
+      uploadMs: uploadMs || undefined,
       checkMs,
       totalMs: Date.now() - startedAt,
-      transport: data && data.imgUrl ? 'cdn' : 'upload-fallback',
-      status
+      transport,
+      status: normalizedResult.status
     });
-    return {
-      safe: result.safe,
-      status,
-      message: result.message || (result.safe ? '图片内容安全检测通过' : '图片未通过内容安全检测')
-    };
+    return normalizedResult;
   } catch (err) {
+    fileID = fileID || (err && err.fileID) || '';
     console.error('[content-security] error', {
       path: tempFilePath,
-      errCode: err && err.errCode,
+      errCode: getResultErrorCode(err) || 'SECURITY_CHECK_ERROR',
+      transport: err && err.transport || transport,
+      cdnHost: err && err.cdnHost || null,
+      reviewCopyMs,
+      uploadMs: err && err.uploadMs || uploadMs || undefined,
+      checkMs: err && err.checkMs || checkMs,
+      totalMs: Date.now() - startedAt,
       message: err && (err.errMsg || err.message)
     });
     return {
       safe: false,
       status: 'error',
+      errCode: getResultErrorCode(err) || 'SECURITY_CHECK_ERROR',
+      transport: err && err.transport || transport,
+      cdnHost: err && err.cdnHost,
       message: '内容安全检测未完成，可稍后重试'
     };
   } finally {
@@ -194,4 +339,11 @@ async function checkMultipleImages(tempFilePaths, onProgress, onResult) {
   return { results };
 }
 
-module.exports = { checkSingleImage, checkMultipleImages };
+module.exports = {
+  checkSingleImage,
+  checkMultipleImages,
+  callSecurityFunction,
+  createResultError,
+  isCdnTransportError,
+  uploadReviewCopy
+};
