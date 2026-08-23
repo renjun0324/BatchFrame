@@ -369,7 +369,7 @@ Page({
     // 允许空字符串，允许用户删除所有内容
     if(val === ''){
       if(!this._borderInputting) {
-        this._borderLastValue = this.data.borderPx || 4;
+        this._borderLastValue = this.data.borderPx || 8;
       }
       this._borderInputting = true;
       this.setData({ borderPx: '' });
@@ -390,7 +390,7 @@ Page({
       });
     } else {
       // 非数字，恢复上一个有效值
-      const lastVal = this._borderLastValue || this.data.borderPx || 4;
+      const lastVal = this._borderLastValue || this.data.borderPx || 8;
       this.setData({ borderPx: lastVal });
     }
   },
@@ -401,7 +401,7 @@ Page({
     const num = parseInt(val, 10);
     if(isNaN(num) || val === ''){
       // 无效值，恢复到上一个有效值或默认值
-      const lastVal = this._borderLastValue || 4;
+      const lastVal = this._borderLastValue || 8;
       this.applyBorder(lastVal);
     } else {
       this._borderLastValue = num;
@@ -455,11 +455,11 @@ Page({
     }
   },
   decBorder(){ 
-    const current = parseInt(this.data.borderPx, 10) || 4;
+    const current = parseInt(this.data.borderPx, 10) || 8;
     this.applyBorder(current - 1); 
   },
   incBorder(){ 
-    const current = parseInt(this.data.borderPx, 10) || 4;
+    const current = parseInt(this.data.borderPx, 10) || 8;
     this.applyBorder(current + 1); 
   },
   decZoom(){ 
