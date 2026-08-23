@@ -36,11 +36,43 @@ function testPathBoundsAndThickness() {
     paths.outer.concat(paths.inner).forEach(point => {
       assert(Number.isFinite(point.x) && Number.isFinite(point.y));
     });
+    assert(!hasSelfIntersection(paths.outer), `${style.id} outer path must not self-intersect`);
+    assert(!hasSelfIntersection(paths.inner), `${style.id} inner path must not self-intersect`);
     const minTopThickness = Math.min(...paths.outer.slice(0, 32).map((point, index) =>
       paths.inner[index].y - point.y
     ));
     assert(minTopThickness > 0, `${style.id} must retain a positive border width`);
   }
+}
+
+function orientation(a, b, c) {
+  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+function segmentsIntersect(a, b, c, d) {
+  const abC = orientation(a, b, c);
+  const abD = orientation(a, b, d);
+  const cdA = orientation(c, d, a);
+  const cdB = orientation(c, d, b);
+  return (abC > 0) !== (abD > 0) && (cdA > 0) !== (cdB > 0);
+}
+
+function hasSelfIntersection(points) {
+  points = points.filter((point, index) => {
+    const previous = points[(index + points.length - 1) % points.length];
+    return point.x !== previous.x || point.y !== previous.y;
+  });
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    for (let j = i + 1; j < points.length; j += 1) {
+      if (j === i + 1 || (i === 0 && j === points.length - 1)) continue;
+      const c = points[j];
+      const d = points[(j + 1) % points.length];
+      if (segmentsIntersect(a, b, c, d)) return true;
+    }
+  }
+  return false;
 }
 
 function testGeometryAndScaling() {

@@ -50,6 +50,7 @@ function generateNormalizedEdgeProfile({
     const sideBias = (sideIndex - 1.5) * 0.04;
     return Array.from({ length: count }, (_, index) => {
       const t = index / (count - 1);
+      if (index === 0 || index === count - 1) return { t, value: 0 };
       const scaled = t * (anchors - 1);
       const left = Math.min(anchors - 2, Math.floor(scaled));
       const ratio = scaled - left;
