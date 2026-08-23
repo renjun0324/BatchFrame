@@ -165,6 +165,32 @@ function drawImageWithInnerFrame({
     return null;
   }
 
+  if (style.renderer === 'clean') {
+    ctx.fillStyle = color || style.color;
+    ctx.fillRect(
+      photoRect.x - frameWidth,
+      photoRect.y - frameWidth,
+      photoRect.width + frameWidth * 2,
+      photoRect.height + frameWidth * 2
+    );
+    ctx.drawImage(image, photoRect.x, photoRect.y, photoRect.width, photoRect.height);
+    return {
+      outer: [
+        { x: photoRect.x - frameWidth, y: photoRect.y - frameWidth },
+        { x: photoRect.x + photoRect.width + frameWidth, y: photoRect.y - frameWidth },
+        { x: photoRect.x + photoRect.width + frameWidth, y: photoRect.y + photoRect.height + frameWidth },
+        { x: photoRect.x - frameWidth, y: photoRect.y + photoRect.height + frameWidth }
+      ],
+      inner: [
+        { x: photoRect.x, y: photoRect.y },
+        { x: photoRect.x + photoRect.width, y: photoRect.y },
+        { x: photoRect.x + photoRect.width, y: photoRect.y + photoRect.height },
+        { x: photoRect.x, y: photoRect.y + photoRect.height }
+      ],
+      frameRect: getFrameRect(photoRect, frameWidth)
+    };
+  }
+
   const paths = buildFramePaths({ photoRect, frameWidth, styleId, seed, strength });
   ctx.save();
   traceSmoothPath(ctx, paths.outer);
