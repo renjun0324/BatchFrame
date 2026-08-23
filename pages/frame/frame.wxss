@@ -211,6 +211,7 @@
 .frame-card-sample.darkroom-scan .frame-card-photo { border: 2px solid #050505; border-left-width: 3px; border-bottom-width: 1px; box-sizing: border-box; transform: rotate(-1deg); }
 .frame-card-sample.rough-emulsion .frame-card-photo { border: 3px solid #030303; border-right-width: 5px; border-top-style: dashed; box-sizing: border-box; }
 .frame-card-sample.none .frame-card-photo { border: 0; }
+.frame-card-mask { position: absolute; left: 18%; top: 8%; width: 64%; height: 20%; opacity: .98; }
 .frame-card-corner { position: absolute; right: 8px; bottom: 7px; width: 12px; height: 12px; border-right: 2px solid #050505; border-bottom: 2px solid #050505; }
 
 .compact-colors { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

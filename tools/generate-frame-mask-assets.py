@@ -32,7 +32,7 @@ def band_mask(style, variant, segment):
     draw = ImageDraw.Draw(mask)
 
     if style == "darkroom-scan":
-        base = min(width, height) * 0.38
+        base = min(width, height) * 0.28
         roughness = 1.5
         blur = 0.7
     else:

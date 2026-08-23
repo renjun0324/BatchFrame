@@ -93,11 +93,12 @@
       <view wx:if="{{activeTool==='frame'}}" class="tool-panel">
         <view class="panel-heading">内框</view>
         <scroll-view class="frame-style-list" scroll-x>
-          <view wx:for="{{innerFrameStyles}}" wx:key="id"
-                class="frame-style-card {{innerFrameStyleId===item.id?'active':''}}"
-                data-style-id="{{item.id}}" bindtap="onInnerFrameStyleTap">
+            <view wx:for="{{innerFrameStyles}}" wx:key="id"
+                  class="frame-style-card {{innerFrameStyleId===item.id?'active':''}}"
+                  data-style-id="{{item.id}}" bindtap="onInnerFrameStyleTap">
             <view class="frame-card-sample {{item.id}}">
               <view class="frame-card-photo"></view>
+              <image wx:if="{{item.previewAsset}}" class="frame-card-mask" src="{{item.previewAsset}}" mode="scaleToFill"></image>
               <view class="frame-card-corner"></view>
             </view>
             <text>{{item.name}}</text>

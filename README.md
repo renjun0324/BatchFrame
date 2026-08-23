@@ -26,7 +26,9 @@
 - ✅ **批量处理**：一次导入多张照片并自动生成  
 - ✅ **图片导出**：一键保存到相册  
 
-正式编辑入口为 `pages/frame/frame`。预览和导出共用 `core/compositeRenderer.js`，不规则边缘使用每张图片稳定的 seed 生成，不添加滤镜、颗粒、漏光、日期或文字编号。安全检测仍由现有云函数链路负责，边框渲染不会绕过审核流程。
+正式编辑入口为 `pages/frame/frame`，编辑页采用预览始终可见的固定工作台。预览和导出共用 `core/compositeRenderer.js`；暗房扫描边和粗粝显影边使用本地分片 Alpha Mask，并按每张图片稳定的 seed 选择变体。不添加滤镜、颗粒、漏光、日期或文字编号。安全检测仍由现有云函数链路负责，边框渲染不会绕过审核流程。
+
+边框视觉对比见 [`docs/frame-style-review/contact-sheet.png`](docs/frame-style-review/contact-sheet.png)，真机回归步骤见 [`docs/fixed-editor-and-frame-qa.md`](docs/fixed-editor-and-frame-qa.md)。遮罩可由 `tools/generate-frame-mask-assets.py` 使用固定 seed 重新生成。
 
 纯函数测试：
 

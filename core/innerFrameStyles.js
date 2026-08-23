@@ -30,7 +30,8 @@ const INNER_FRAME_STYLES = Object.freeze([
     edgeStrength: 0.18,
     fragmentDensity: 0,
     maskRoot: 'assets/frame-masks/darkroom-scan',
-    maskVariants: 2
+    maskVariants: 2,
+    previewAsset: '/assets/frame-masks/darkroom-scan/variant-01/top.png'
   },
   {
     id: 'rough-emulsion',
@@ -41,14 +42,15 @@ const INNER_FRAME_STYLES = Object.freeze([
     edgeStrength: 0.42,
     fragmentDensity: 0.15,
     maskRoot: 'assets/frame-masks/rough-emulsion',
-    maskVariants: 3
+    maskVariants: 3,
+    previewAsset: '/assets/frame-masks/rough-emulsion/variant-01/top.png'
   }
 ]);
 
 const EDGE_STRENGTHS = Object.freeze([
   { id: 'light', name: '轻', value: 0.65 },
-  { id: 'medium', name: '中', value: 1 },
-  { id: 'strong', name: '重', value: 1.25 }
+  { id: 'medium', name: '标准', value: 1 },
+  { id: 'strong', name: '明显', value: 1.25 }
 ]);
 
 function getInnerFrameStyle(id) {
