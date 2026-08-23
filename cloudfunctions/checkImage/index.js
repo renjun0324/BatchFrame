@@ -87,6 +87,7 @@ exports.main = async (event, context) => {
       console.error('错误：缺少图片参数')
       return {
         success: false,
+        status: 'error',
         errCode: -1,
         errMsg: '缺少图片参数'
       }
@@ -120,6 +121,7 @@ exports.main = async (event, context) => {
     if (!allowedContentTypes.includes(contentType)) {
       return {
         success: false,
+        status: 'error',
         errCode: -3,
         errMsg: '不支持的图片格式'
       }
@@ -147,6 +149,7 @@ exports.main = async (event, context) => {
       return {
         success: true,
         safe: true,
+        status: 'passed',
         message: '图片内容安全'
       }
     } else if (result.errCode === 87014) {
@@ -154,12 +157,14 @@ exports.main = async (event, context) => {
       return {
         success: true,
         safe: false,
+        status: 'rejected',
         message: '图片包含违规内容'
       }
     } else {
       console.error('❌ 检测失败，错误码:', result.errCode)
       return {
         success: false,
+        status: 'error',
         errCode: result.errCode,
         errMsg: result.errMsg || '检测失败'
       }
@@ -170,9 +175,20 @@ exports.main = async (event, context) => {
     console.error(`❌ 图片安全检测异常，耗时 ${totalTime}ms`)
     console.error('错误详情:', err)
     console.error('错误堆栈:', err.stack)
+
+    // SDK 版本不同可能将明确违规作为异常抛出，仍需保留 rejected 语义。
+    if (Number(err && err.errCode) === 87014) {
+      return {
+        success: true,
+        safe: false,
+        status: 'rejected',
+        message: '图片包含违规内容'
+      }
+    }
     
     return {
       success: false,
+      status: 'error',
       errCode: err.errCode || -1,
       errMsg: err.errMsg || err.message || '检测异常'
     }

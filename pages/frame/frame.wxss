@@ -373,6 +373,12 @@
 .thumbs { white-space:nowrap; margin:14px 0; }
 .thumb { width:56px; height:56px; object-fit:cover; margin-right:8px; border:2px solid transparent; border-radius:10px; background:#141820; }
 .thumb.active { border-color:#2f81f7; }
+.thumb-wrap, .thumbnail-wrap { position:relative; display:inline-block; vertical-align:top; }
+.security-dot { position:absolute; right:8px; top:2px; width:16px; height:16px; border-radius:50%; color:#fff; font-size:11px; line-height:16px; text-align:center; }
+.security-dot.checking { width:10px; height:10px; right:11px; top:5px; background:#2f81f7; animation:security-pulse 1s ease-in-out infinite; }
+.security-dot.rejected { background:#e5484d; }
+.security-dot.error { background:#d99000; }
+@keyframes security-pulse { 50% { opacity:.35; } }
 
 /* Actions */
 .actions { margin-top:6px; flex-direction:column; gap:6px; justify-content:center; }

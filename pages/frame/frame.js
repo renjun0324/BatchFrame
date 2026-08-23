@@ -10,6 +10,18 @@ function parseRatio(str){
   return [parseInt(m[1],10), parseInt(m[2],10)];
 }
 
+function imagePath(image) {
+  return typeof image === 'string' ? image : (image && image.path) || '';
+}
+
+function imageRecord(path, index) {
+  return {
+    id: `image-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+    path,
+    securityStatus: 'checking'
+  };
+}
+
 Page({
   data: {
     images: [],
@@ -64,12 +76,26 @@ Page({
     // 图片缓存和性能优化
     _imageCache: {}, // 图片加载缓存
     _canvasReady: false, // 画布准备状态
+    canvasReady: false,
+    imageReady: false,
   },
 
   onReady(){
+    this.canvasReady = false;
+    this.imageReady = false;
+    this.pendingRender = false;
     this.initPreviewCanvas();
     this.updatePreviewSize();
     this.generateColorGrid();
+  },
+
+  onUnload(){
+    this._securityCheckId = (this._securityCheckId || 0) + 1;
+    this.canvasReady = false;
+    this.pendingRender = false;
+    if (this._canvasRetryTimer) clearTimeout(this._canvasRetryTimer);
+    if (this._redrawTimer) clearTimeout(this._redrawTimer);
+    if (this._imageInfoCache) this._imageInfoCache = {};
   },
   
   // 生成颜色网格数据
@@ -123,23 +149,28 @@ Page({
         if(paths.length === 0) return;
         const checkId = (this._securityCheckId || 0) + 1;
         this._securityCheckId = checkId;
+        const images = paths.map(imageRecord);
         this.setData({
-          images: [],
+          images,
           curIndex: 0,
           isChecking: true,
           checkingProgress: 0,
           checkingTotal: paths.length
+        }, () => {
+          this.imageReady = false;
+          this.pendingRender = true;
+          this.extractMainColors(paths[0]);
+          this.updatePreviewSize().then(() => this.redrawPreview());
         });
-        wx.showLoading({ title: '正在安全检测…', mask: true });
         this.backgroundCheckImages(paths, checkId);
       }
     });
   },
 
-  // 只有明确通过安全检测的图片才会进入编辑列表。
+  // 安全检测在后台运行；只有导出前才会拦截未通过的图片。
   async backgroundCheckImages(paths, checkId) {
     try {
-      const checkResult = await contentSecurity.checkMultipleImages(
+      await contentSecurity.checkMultipleImages(
         paths,
         (current, total) => {
           if (this._securityCheckId !== checkId) return;
@@ -147,40 +178,91 @@ Page({
             checkingProgress: current,
             checkingTotal: total
           });
-        }
+        },
+        result => this.applySecurityResult(result, checkId)
       );
       if (this._securityCheckId !== checkId) return;
-      wx.hideLoading();
       this.setData({ isChecking: false });
-      const safePaths = checkResult.results.filter(r => r.status === 'passed').map(r => r.path);
-      const rejected = checkResult.results.filter(r => r.status === 'rejected').length;
-      const errors = checkResult.results.filter(r => r.status === 'error').length;
-      if (safePaths.length) {
-        this.setData({ images: safePaths, curIndex: 0 }, () => {
-          this.extractMainColors(safePaths[0]);
-          this.updatePreviewSize().then(() => this.redrawPreview());
-        });
-      }
-      if (!safePaths.length || rejected || errors) {
-        const detail = safePaths.length
-          ? `已导入 ${safePaths.length} 张通过检测的图片；${rejected} 张未通过，${errors} 张检测异常，均未导入。`
-          : `未导入图片：${rejected} 张未通过内容安全检测，${errors} 张检测异常。请稍后重试。`;
-        wx.showModal({ title: '内容安全提示', content: detail, showCancel: false });
-      }
     } catch (err) {
       if (this._securityCheckId !== checkId) return;
-      wx.hideLoading();
-      console.error('后台检测失败:', err);
-      this.setData({ images: [], curIndex: 0, isChecking: false });
-      wx.showModal({ title: '内容安全提示', content: '内容安全检测未完成，本次图片不能使用，请稍后重试。', showCancel: false });
+      console.error('[content-security] background batch failed', err);
+      this.setData({ isChecking: false });
     }
+  },
+
+  applySecurityResult(result, checkId) {
+    if (!result || this._securityCheckId !== checkId) return;
+    const index = this.data.images.findIndex(item => imagePath(item) === result.path);
+    if (index < 0) return;
+    this.setData({
+      [`images[${index}].securityStatus`]: result.status
+    });
+    console.info('[content-security] image status', {
+      id: this.data.images[index].id,
+      path: result.path,
+      status: result.status
+    });
+  },
+
+  async ensureSecurityBeforeExport() {
+    const current = this.data.images || [];
+    const rejected = current.filter(item => item.securityStatus === 'rejected');
+    if (rejected.length) {
+      await this.showSecurityBlock(rejected);
+      return false;
+    }
+
+    const retryItems = current.filter(item => item.securityStatus !== 'passed');
+    if (retryItems.length) {
+      const retryPaths = retryItems.map(imagePath);
+      const retryId = (this._securityCheckId || 0) + 1;
+      this._securityCheckId = retryId;
+      this.setData({ isChecking: true });
+      await contentSecurity.checkMultipleImages(
+        retryPaths,
+        null,
+        result => this.applySecurityResult(result, retryId)
+      );
+      if (this._securityCheckId !== retryId) return false;
+      this.setData({ isChecking: false });
+    }
+
+    const latest = this.data.images || [];
+    const rejectedAfterRetry = latest.filter(item => item.securityStatus === 'rejected');
+    if (rejectedAfterRetry.length) {
+      await this.showSecurityBlock(rejectedAfterRetry);
+      return false;
+    }
+    const unresolved = latest.filter(item => item.securityStatus !== 'passed');
+    if (unresolved.length) {
+      wx.showModal({
+        title: '暂时无法导出',
+        content: '检测服务暂时不可用，请稍后重试。图片仍可继续编辑。',
+        showCancel: false
+      });
+      return false;
+    }
+    return true;
+  },
+
+  showSecurityBlock(items) {
+    const positions = items.map(item => this.data.images.findIndex(current => current.id === item.id) + 1).join('、');
+    return new Promise(resolve => {
+      wx.showModal({
+        title: '请移除未通过的图片',
+        content: `第 ${positions} 张图片未通过安全检测，请删除后再导出。`,
+        showCancel: false,
+        success: resolve,
+        fail: resolve
+      });
+    });
   },
   onPickIndex(e){ 
     const idx = +e.currentTarget.dataset.idx || 0; 
     this.setData({curIndex:idx}, ()=>{
       // 分析当前选中图片的主色调
       if(this.data.images.length > idx){
-        this.extractMainColors(this.data.images[idx]);
+        this.extractMainColors(imagePath(this.data.images[idx]));
       }
       this.updatePreviewSize().then(()=> this.redrawPreview());
     });
@@ -254,7 +336,7 @@ Page({
     };
 
     if(ratioValue === 'auto'){
-      const cur = this.data.images[this.data.curIndex];
+      const cur = imagePath(this.data.images[this.data.curIndex]);
       if(!cur){
         return applySize(3,4);
       }
@@ -577,11 +659,18 @@ Page({
 
   // 预览画布
   initPreviewCanvas(onlyResize=false){
+    if (this._canvasRetryTimer) clearTimeout(this._canvasRetryTimer);
+    this._canvasRetryTimer = null;
+    this.canvasReady = false;
     const query = wx.createSelectorQuery();
     query.select('#preview').fields({ node:true, size:true }).exec(res=>{
       if (!res[0] || !res[0].node) {
         console.warn('Canvas not found, retrying...');
-        setTimeout(() => this.initPreviewCanvas(onlyResize), 100);
+        this.pendingRender = true;
+        this._canvasRetryTimer = setTimeout(() => {
+          this._canvasRetryTimer = null;
+          this.initPreviewCanvas(onlyResize);
+        }, 100);
         return;
       }
       
@@ -593,27 +682,30 @@ Page({
       ctx.scale(DPR/2, DPR/2);
       this.pCanvas = canvas; 
       this.pCtx = ctx;
+      this.canvasReady = true;
       
       // 标记画布准备就绪
-      this.setData({ _canvasReady: true });
-      
-      if(!onlyResize) this.redrawPreview();
+      this.setData({ _canvasReady: true, canvasReady: true }, () => {
+        if (this.pendingRender || this.data.images.length) this.redrawPreview();
+      });
     });
   },
 
   redrawPreview(){
     // 检查画布是否准备就绪
-    if(!this.pCanvas || !this.pCtx || !this.data._canvasReady) {
+    if(!this.pCanvas || !this.pCtx || !this.canvasReady || !this.data._canvasReady) {
       console.warn('Canvas not ready, skipping redraw');
+      this.pendingRender = true;
       return;
     }
     
     if(!this.data.images.length){ 
+      this.pendingRender = false;
       this.clearPreview(); 
       return; 
     }
     
-    const cur = this.data.images[this.data.curIndex];
+    const cur = imagePath(this.data.images[this.data.curIndex]);
     const borderForDraw = this.data.enableInnerBorder ? this.previewBorderForShow(this.data.borderPx) : 0;
     
     // 使用防抖避免频繁重绘
@@ -621,6 +713,7 @@ Page({
       clearTimeout(this._redrawTimer);
     }
     
+    this.pendingRender = false;
     this._redrawTimer = setTimeout(() => {
       this.drawToCanvas({
         canvas:this.pCanvas, ctx:this.pCtx,
@@ -674,6 +767,8 @@ Page({
       // 检查图片缓存
       if (this.data._imageCache && this.data._imageCache[imgPath]) {
         const cachedImg = this.data._imageCache[imgPath];
+        this.imageReady = true;
+        this.setData({ imageReady: true });
         this.drawImageWithCorrectAspect(cachedImg, ctx, outW, outH, borderPx, zoom, enableInnerBorder, innerBorderColor);
         resolve();
         return;
@@ -681,6 +776,8 @@ Page({
 
       const img = canvas.createImage();
       img.onload = ()=>{
+        this.imageReady = true;
+        this.setData({ imageReady: true });
         // 缓存图片
         if (!this.data._imageCache) {
           this.data._imageCache = {};
@@ -691,6 +788,8 @@ Page({
         resolve();
       };
       img.onerror = ()=>{
+        this.imageReady = false;
+        this.setData({ imageReady: false });
         ctx.fillStyle='#eee';
         ctx.fillRect(0,0,outW,outH);
         resolve();
@@ -753,17 +852,26 @@ Page({
 
   // 批量导出（按当前参数）
   async exportAll(){
-    const list = this.data.images;
-    if(this.data.isChecking){
-      wx.showToast({ title: '请等待内容安全检测完成', icon: 'none' });
+    if(!this.data.images.length || this.data.exporting || this._exportSecurityBusy) return;
+    this._exportSecurityBusy = true;
+    let securityReady = false;
+    try {
+      securityReady = await this.ensureSecurityBeforeExport();
+    } catch (err) {
+      console.error('[content-security] export preflight failed', err);
+      wx.showModal({ title: '暂时无法导出', content: '检测服务暂时不可用，请稍后重试。图片仍可继续编辑。', showCancel: false });
+    }
+    if (!securityReady) {
+      this._exportSecurityBusy = false;
       return;
     }
-    if(!list.length || this.data.exporting) return;
+    const list = this.data.images.map(imagePath);
 
     try{
       await this.ensureAlbumPermission();
     } catch(err){
       wx.showToast({ title: '未获得相册权限', icon: 'none' });
+      this._exportSecurityBusy = false;
       return;
     }
 
@@ -850,6 +958,7 @@ Page({
       }
     } finally {
       this.setData({exporting:false});
+      this._exportSecurityBusy = false;
       this.initPreviewCanvas(true);
       this.redrawPreview();
     }

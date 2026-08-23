@@ -4,9 +4,6 @@
     <button class="btn primary" bindtap="chooseImages">选择照片</button>
     <view class="export-info" wx:if="{{images.length > 0}}">
       <text>已选择 {{images.length}} 张</text>
-      <view class="checking-badge" wx:if="{{isChecking}}">
-        <text class="checking-text">🔍 检测中 {{checkingProgress}}/{{checkingTotal}}</text>
-      </view>
     </view>
   </view>
 
@@ -23,10 +20,15 @@
       
       <!-- 缩略图 -->
       <scroll-view class="thumbnail-list" scroll-x wx:if="{{images.length > 0}}">
-        <image wx:for="{{images}}" wx:key="*this" src="{{item}}"
-               class="thumbnail {{index===curIndex?'active':''}}"
-               mode="aspectFit"
-               bindtap="onPickIndex" data-idx="{{index}}"/>
+        <view wx:for="{{images}}" wx:key="id" class="thumbnail-wrap">
+          <image src="{{item.path}}"
+                 class="thumbnail {{index===curIndex?'active':''}}"
+                 mode="aspectFit"
+                 bindtap="onPickIndex" data-idx="{{index}}"/>
+          <view wx:if="{{item.securityStatus==='checking'}}" class="security-dot checking"></view>
+          <view wx:if="{{item.securityStatus==='rejected'}}" class="security-dot rejected">!</view>
+          <view wx:if="{{item.securityStatus==='error'}}" class="security-dot error">?</view>
+        </view>
       </scroll-view>
     </view>
 
@@ -129,7 +131,7 @@
 
   <!-- 底部操作按钮 -->
   <view class="bottom-actions" wx:if="{{images.length > 0}}">
-    <button class="btn large-primary" bindtap="exportAll" disabled="{{exporting || isChecking}}">
+    <button class="btn large-primary" bindtap="exportAll" disabled="{{exporting}}">
       <text wx:if="{{exporting}}">处理中... {{progressCur}}/{{progressTotal}}</text>
       <text wx:else>批量导出 ({{images.length}}张)</text>
     </button>

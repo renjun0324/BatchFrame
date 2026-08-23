@@ -90,15 +90,20 @@
 
     <!-- 缩略图 -->
     <scroll-view class="thumbs" scroll-x>
-      <image wx:for="{{images}}" wx:key="*this" src="{{item}}"
-             class="thumb {{index===curIndex?'active':''}}"
-             mode="aspectFit"
-             bindtap="onPickIndex" data-idx="{{index}}"/>
+      <view wx:for="{{images}}" wx:key="id" class="thumb-wrap">
+        <image src="{{item.path}}"
+               class="thumb {{index===curIndex?'active':''}}"
+               mode="aspectFit"
+               bindtap="onPickIndex" data-idx="{{index}}"/>
+        <view wx:if="{{item.securityStatus==='checking'}}" class="security-dot checking"></view>
+        <view wx:if="{{item.securityStatus==='rejected'}}" class="security-dot rejected">!</view>
+        <view wx:if="{{item.securityStatus==='error'}}" class="security-dot error">?</view>
+      </view>
     </scroll-view>
 
     <!-- 执行 -->
     <view class="row actions">
-      <button class="btn primary" bindtap="exportAll" disabled="{{images.length===0 || exporting || isChecking}}">
+      <button class="btn primary" bindtap="exportAll" disabled="{{images.length===0 || exporting}}">
         批量导出并保存 ({{images.length}} 张)
       </button>
       <text wx:if="{{exporting}}">进度：{{progressCur}} / {{progressTotal}}</text>

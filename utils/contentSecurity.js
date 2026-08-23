@@ -1,8 +1,8 @@
 /**
  * 用户图片内容安全检测。
  *
- * 合规原则：只有收到微信安全接口的明确通过结果，图片才可以进入编辑或导出流程。
- * 网络、云函数或接口异常一律视为未通过，绝不能降级为放行。
+ * 合规原则：只有收到微信安全接口的明确通过结果，图片才可以进入导出流程。
+ * 检测异常只代表服务没有完成，不把它伪装成违规；导出前会再次重试异常图片。
  */
 
 const CONTENT_TYPES = {
@@ -27,11 +27,11 @@ function getImageInfo(filePath) {
   });
 }
 
-async function resolveContentType(filePath) {
+async function resolveContentType(filePath, imageInfo) {
   const fromPath = getContentTypeFromPath(filePath);
   if (fromPath) return fromPath;
 
-  const info = await getImageInfo(filePath);
+  const info = imageInfo || await getImageInfo(filePath);
   return CONTENT_TYPES[String(info.type || '').toLowerCase()] || null;
 }
 
@@ -43,8 +43,41 @@ function withTimeout(promise, timeoutMs) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+function compressForSecurity(filePath, info) {
+  if (typeof wx.compressImage !== 'function') return Promise.resolve(filePath);
+
+  const width = Number(info && info.width) || 0;
+  const height = Number(info && info.height) || 0;
+  if (!width || !height) return Promise.reject(new Error('无法读取图片尺寸'));
+
+  const scale = Math.min(1, 1024 / Math.max(width, height));
+  const compressedWidth = Math.max(1, Math.round(width * scale));
+  const compressedHeight = Math.max(1, Math.round(height * scale));
+  const startedAt = Date.now();
+
+  return withTimeout(new Promise((resolve, reject) => {
+    wx.compressImage({
+      src: filePath,
+      quality: 75,
+      compressedWidth,
+      compressedHeight,
+      success: result => resolve(result && result.tempFilePath),
+      fail: reject
+    });
+  }), 30000).then(reviewPath => {
+    if (!reviewPath) throw new Error('审核副本生成失败');
+    console.info('[content-security] review copy', {
+      source: filePath,
+      width: compressedWidth,
+      height: compressedHeight,
+      elapsedMs: Date.now() - startedAt
+    });
+    return reviewPath;
+  });
+}
+
 /**
- * 检测一张图片；异常、超时、未知格式均返回“不通过”。
+ * 检测一张图片；异常、超时、未知格式均返回 error，只有明确违规才返回 rejected。
  */
 async function checkSingleImage(tempFilePath) {
   let fileID = '';
@@ -54,7 +87,9 @@ async function checkSingleImage(tempFilePath) {
       throw new Error('云开发未初始化，无法进行内容安全检测');
     }
 
-    const contentType = await resolveContentType(tempFilePath);
+    const startedAt = Date.now();
+    const info = await withTimeout(getImageInfo(tempFilePath), 10000);
+    const contentType = await resolveContentType(tempFilePath, info);
     if (!contentType) {
       return {
         safe: false,
@@ -63,48 +98,60 @@ async function checkSingleImage(tempFilePath) {
       };
     }
 
-    let data;
+    const reviewPath = await compressForSecurity(tempFilePath, info);
+    const reviewContentType = reviewPath === tempFilePath ? contentType : 'image/jpeg';
+    const uploadStartedAt = Date.now();
+    const uploadResult = await withTimeout(wx.cloud.uploadFile({
+      cloudPath: `temp-check/${Date.now()}-${Math.random().toString(36).slice(2)}.${reviewContentType.split('/')[1]}`,
+      filePath: reviewPath
+    }), 30000);
 
-    // CDN 方式避免“上传云存储→云函数下载→删除”的额外往返。
-    // 旧版基础库没有 wx.cloud.CDN 时，保留云存储方式作为兼容回退。
-    if (typeof wx.cloud.CDN === 'function') {
-      data = {
-        imgUrl: wx.cloud.CDN({
-          type: 'filePath',
-          filePath: tempFilePath
-        }),
-        contentType
-      };
-    } else {
-      const uploadResult = await withTimeout(wx.cloud.uploadFile({
-        cloudPath: `temp-check/${Date.now()}-${Math.random().toString(36).slice(2)}.${contentType.split('/')[1]}`,
-        filePath: tempFilePath
-      }), 30000);
+    fileID = uploadResult && uploadResult.fileID;
+    if (!fileID) throw new Error('图片上传失败');
+    const uploadMs = Date.now() - uploadStartedAt;
+    console.info('[content-security] upload completed', {
+      path: tempFilePath,
+      uploadMs
+    });
 
-      fileID = uploadResult && uploadResult.fileID;
-      if (!fileID) throw new Error('图片上传失败');
-      data = { fileID, contentType };
-    }
-
+    const checkStartedAt = Date.now();
     const response = await withTimeout(wx.cloud.callFunction({
       name: 'checkImage',
-      data
+      data: { fileID, contentType: reviewContentType }
     }), 30000);
+    const checkMs = Date.now() - checkStartedAt;
     const result = response && response.result;
 
     if (!result || result.success !== true || typeof result.safe !== 'boolean') {
       throw new Error((result && result.errMsg) || '内容安全服务返回异常');
     }
 
-    return result.safe
-      ? { safe: true, status: 'passed', message: '图片内容安全检测通过' }
-      : { safe: false, status: 'rejected', message: result.message || '图片未通过内容安全检测' };
+    const status = result.status || (result.safe ? 'passed' : 'rejected');
+    if (!['passed', 'rejected'].includes(status) || (status === 'passed') !== result.safe) {
+      throw new Error('内容安全服务状态不一致');
+    }
+    console.info('[content-security] completed', {
+      path: tempFilePath,
+      uploadMs,
+      checkMs,
+      totalMs: Date.now() - startedAt,
+      status
+    });
+    return {
+      safe: result.safe,
+      status,
+      message: result.message || (result.safe ? '图片内容安全检测通过' : '图片未通过内容安全检测')
+    };
   } catch (err) {
-    console.error('图片安全检测失败，已拒绝使用该图片：', err);
+    console.error('[content-security] error', {
+      path: tempFilePath,
+      errCode: err && err.errCode,
+      message: err && (err.errMsg || err.message)
+    });
     return {
       safe: false,
       status: 'error',
-      message: '内容安全检测未完成，请稍后重试'
+      message: '内容安全检测未完成，可稍后重试'
     };
   } finally {
     if (fileID && wx.cloud && wx.cloud.deleteFile) {
@@ -118,10 +165,10 @@ async function checkSingleImage(tempFilePath) {
   }
 }
 
-async function checkMultipleImages(tempFilePaths, onProgress) {
+async function checkMultipleImages(tempFilePaths, onProgress, onResult) {
   const results = [];
   let completedCount = 0;
-  const concurrentLimit = 2;
+  const concurrentLimit = 4;
 
   for (let i = 0; i < tempFilePaths.length; i += concurrentLimit) {
     const chunk = tempFilePaths.slice(i, i + concurrentLimit);
@@ -129,17 +176,14 @@ async function checkMultipleImages(tempFilePaths, onProgress) {
       const result = await checkSingleImage(path);
       completedCount += 1;
       if (onProgress) onProgress(completedCount, tempFilePaths.length);
-      return { path, ...result };
+      const item = { path, ...result };
+      if (onResult) onResult(item);
+      return item;
     }));
     results.push(...chunkResults);
   }
 
-  const unsafeCount = results.filter(item => !item.safe).length;
-  return {
-    allSafe: unsafeCount === 0,
-    unsafeCount,
-    results
-  };
+  return { results };
 }
 
 module.exports = { checkSingleImage, checkMultipleImages };
