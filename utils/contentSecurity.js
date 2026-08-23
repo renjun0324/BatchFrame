@@ -100,24 +100,32 @@ async function checkSingleImage(tempFilePath) {
 
     const reviewPath = await compressForSecurity(tempFilePath, info);
     const reviewContentType = reviewPath === tempFilePath ? contentType : 'image/jpeg';
-    const uploadStartedAt = Date.now();
-    const uploadResult = await withTimeout(wx.cloud.uploadFile({
-      cloudPath: `temp-check/${Date.now()}-${Math.random().toString(36).slice(2)}.${reviewContentType.split('/')[1]}`,
-      filePath: reviewPath
-    }), 30000);
+    let data;
+    if (typeof wx.cloud.CDN === 'function') {
+      const imgUrl = wx.cloud.CDN({ type: 'filePath', filePath: reviewPath });
+      if (!imgUrl) throw new Error('审核副本 CDN 地址生成失败');
+      data = { imgUrl, contentType: reviewContentType };
+      console.info('[content-security] using CDN review path', { path: tempFilePath });
+    } else {
+      const uploadStartedAt = Date.now();
+      const uploadResult = await withTimeout(wx.cloud.uploadFile({
+        cloudPath: `temp-check/${Date.now()}-${Math.random().toString(36).slice(2)}.${reviewContentType.split('/')[1]}`,
+        filePath: reviewPath
+      }), 30000);
 
-    fileID = uploadResult && uploadResult.fileID;
-    if (!fileID) throw new Error('图片上传失败');
-    const uploadMs = Date.now() - uploadStartedAt;
-    console.info('[content-security] upload completed', {
-      path: tempFilePath,
-      uploadMs
-    });
+      fileID = uploadResult && uploadResult.fileID;
+      if (!fileID) throw new Error('图片上传失败');
+      data = { fileID, contentType: reviewContentType };
+      console.info('[content-security] upload fallback completed', {
+        path: tempFilePath,
+        uploadMs: Date.now() - uploadStartedAt
+      });
+    }
 
     const checkStartedAt = Date.now();
     const response = await withTimeout(wx.cloud.callFunction({
       name: 'checkImage',
-      data: { fileID, contentType: reviewContentType }
+      data
     }), 30000);
     const checkMs = Date.now() - checkStartedAt;
     const result = response && response.result;
@@ -132,9 +140,9 @@ async function checkSingleImage(tempFilePath) {
     }
     console.info('[content-security] completed', {
       path: tempFilePath,
-      uploadMs,
       checkMs,
       totalMs: Date.now() - startedAt,
+      transport: data && data.imgUrl ? 'cdn' : 'upload-fallback',
       status
     });
     return {
