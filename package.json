@@ -1,0 +1,7 @@
+{
+  "name": "batchframe",
+  "private": true,
+  "scripts": {
+    "test": "node tests/film-inner-frame.test.js"
+  }
+}
