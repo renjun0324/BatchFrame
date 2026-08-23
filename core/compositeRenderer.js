@@ -61,7 +61,8 @@ function renderComposite({
     styleId: enabled ? style.id : 'none',
     color: enabled ? frameColor : undefined,
     seed: imageSeed || imageId || 'default',
-    strength
+    strength,
+    maskImages: innerFrameSettings.maskImages
   });
 
   return {

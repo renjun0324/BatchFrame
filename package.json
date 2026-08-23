@@ -2,6 +2,6 @@
   "name": "batchframe",
   "private": true,
   "scripts": {
-    "test": "node tests/film-inner-frame.test.js"
+    "test": "python3 tools/verify-frame-mask-assets.py && node tests/film-inner-frame.test.js"
   }
 }

@@ -1,6 +1,7 @@
 const contentSecurity = require('../../utils/contentSecurity.js');
 const { INNER_FRAME_STYLES, EDGE_STRENGTHS, getInnerFrameStyle } = require('../../core/innerFrameStyles.js');
 const { renderComposite } = require('../../core/compositeRenderer.js');
+const { selectMaskVariant, getMaskAssetPaths } = require('../../core/innerFrameRenderer.js');
 const sys = wx.getWindowInfo();
 const DPR = sys.pixelRatio || 1;
 
@@ -101,6 +102,7 @@ Page({
   onReady(){
     this._imageCache = Object.create(null);
     this._imageCacheOrder = [];
+    this._frameMaskCache = Object.create(null);
     this._renderToken = 0;
     this._frameWidths = { 'clean-black': 8, 'darkroom-scan': 12, 'rough-emulsion': 16 };
     this.canvasReady = false;
@@ -128,6 +130,7 @@ Page({
     this._renderToken = (this._renderToken || 0) + 1;
     this._imageCache = Object.create(null);
     this._imageCacheOrder = [];
+    this._frameMaskCache = Object.create(null);
     if (this._imageInfoCache) this._imageInfoCache = {};
   },
   
@@ -854,6 +857,30 @@ Page({
     }
   },
 
+  loadFrameMasks(canvas, styleId, seed){
+    const variant = selectMaskVariant(styleId, seed || 'default');
+    const paths = getMaskAssetPaths(styleId, variant);
+    if (!paths) return Promise.resolve(null);
+    const cacheKey = `${styleId}:${variant}`;
+    if (this._frameMaskCache && this._frameMaskCache[cacheKey]) {
+      return Promise.resolve(this._frameMaskCache[cacheKey]);
+    }
+    const segments = Object.keys(paths);
+    return Promise.all(segments.map(segment => new Promise((resolve, reject) => {
+      const mask = canvas.createImage();
+      mask.onload = () => resolve([segment, mask]);
+      mask.onerror = error => reject(error);
+      mask.src = paths[segment];
+    }))).then(entries => {
+      const masks = entries.reduce((result, entry) => {
+        result[entry[0]] = entry[1];
+        return result;
+      }, {});
+      if (this._frameMaskCache) this._frameMaskCache[cacheKey] = masks;
+      return masks;
+    });
+  },
+
   // 预览与导出共用的图片加载适配层；实际构图由 core/compositeRenderer 完成。
   drawToCanvas({
     canvas,
@@ -875,7 +902,17 @@ Page({
   }){
     return new Promise((resolve)=>{
       const isCurrent = () => !renderToken || renderToken === this._renderToken;
-      const draw = image => {
+      const draw = async image => {
+        if (!isCurrent()) {
+          resolve();
+          return;
+        }
+        let maskImages = null;
+        try {
+          maskImages = await this.loadFrameMasks(canvas, innerFrameStyleId, imageSeed || imageId || imgPath);
+        } catch (error) {
+          console.warn('[frame-mask] asset load failed, falling back to clean frame', error);
+        }
         if (!isCurrent()) {
           resolve();
           return;
@@ -896,7 +933,8 @@ Page({
             styleId: innerFrameStyleId,
             widthAt1800: borderPx,
             color: innerBorderColor,
-            strengthLevel: edgeStrengthLevel
+            strengthLevel: edgeStrengthLevel,
+            maskImages
           }
         });
         resolve();

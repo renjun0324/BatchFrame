@@ -4,6 +4,7 @@ const { clamp, getFrameRect } = require('./frameGeometry');
 const PROFILE_CACHE_LIMIT = 128;
 const profileCache = Object.create(null);
 const profileCacheOrder = [];
+const MASK_SEGMENTS = ['top-left', 'top', 'top-right', 'right', 'bottom-right', 'bottom', 'bottom-left', 'left'];
 
 function hashSeed(value) {
   const text = String(value == null ? 'default' : value);
@@ -42,7 +43,7 @@ function generateNormalizedEdgeProfile({
   const random = createSeededRandom(`${seed}:${style.id}`);
 
   function createSide(sideIndex) {
-    if (style.renderer !== 'irregular' || style.edgeStrength <= 0) {
+    if (!['irregular', 'mask'].includes(style.renderer) || style.edgeStrength <= 0) {
       return Array.from({ length: count }, (_, index) => ({
         t: index / (count - 1),
         value: 0
@@ -91,6 +92,22 @@ function getCachedNormalizedEdgeProfile(options = {}) {
     delete profileCache[profileCacheOrder.shift()];
   }
   return profile;
+}
+
+function selectMaskVariant(styleId, seed) {
+  const style = getInnerFrameStyle(styleId);
+  const count = Math.max(1, Number(style.maskVariants) || 1);
+  return hashSeed(`${styleId}:${seed}:mask`) % count + 1;
+}
+
+function getMaskAssetPaths(styleId, variant) {
+  const style = getInnerFrameStyle(styleId);
+  if (!style.maskRoot || !style.maskVariants) return null;
+  const selected = Math.max(1, Math.min(style.maskVariants, Number(variant) || 1));
+  return MASK_SEGMENTS.reduce((result, segment) => {
+    result[segment] = `/${style.maskRoot}/variant-${String(selected).padStart(2, '0')}/${segment}.png`;
+    return result;
+  }, {});
 }
 
 function edgeValue(profile, side, index) {
@@ -178,7 +195,8 @@ function drawImageWithInnerFrame({
   styleId = 'clean-black',
   color,
   seed = 'default',
-  strength = 1
+  strength = 1,
+  maskImages
 }) {
   const style = getInnerFrameStyle(styleId);
   if (style.id === 'none' || frameWidth <= 0) {
@@ -212,6 +230,33 @@ function drawImageWithInnerFrame({
     };
   }
 
+  if (style.renderer === 'mask') {
+    if (maskImages && MASK_SEGMENTS.every(segment => maskImages[segment])) {
+      return drawImageWithSegmentedMask({
+        ctx,
+        image,
+        photoRect,
+        frameWidth,
+        styleId,
+        color,
+        seed,
+        strength,
+        maskImages
+      });
+    }
+    // A missing local asset must remain usable and visibly safe. Fall back to
+    // the clean rectangular frame rather than recreating the old random edge.
+    ctx.fillStyle = color || style.color;
+    ctx.fillRect(
+      photoRect.x - frameWidth,
+      photoRect.y - frameWidth,
+      photoRect.width + frameWidth * 2,
+      photoRect.height + frameWidth * 2
+    );
+    ctx.drawImage(image, photoRect.x, photoRect.y, photoRect.width, photoRect.height);
+    return null;
+  }
+
   const paths = buildFramePaths({ photoRect, frameWidth, styleId, seed, strength });
   ctx.save();
   traceSmoothPath(ctx, paths.outer);
@@ -229,6 +274,57 @@ function drawImageWithInnerFrame({
     drawFragments(ctx, paths, seed, color || style.color, style.fragmentDensity);
   }
   return paths;
+}
+
+function drawImageWithSegmentedMask({
+  ctx,
+  image,
+  photoRect,
+  frameWidth,
+  styleId,
+  color,
+  seed,
+  strength,
+  maskImages
+}) {
+  const style = getInnerFrameStyle(styleId);
+  const frameRect = getFrameRect(photoRect, frameWidth);
+  const cornerSize = Math.max(frameWidth * 3.2, 12);
+  const edgeWidth = Math.max(1, frameRect.width - cornerSize * 2);
+  const edgeHeight = Math.max(1, frameRect.height - cornerSize * 2);
+  const paths = buildFramePaths({
+    photoRect,
+    frameWidth,
+    styleId,
+    seed,
+    strength: Math.max(0.45, strength),
+    pointCount: 32
+  });
+
+  ctx.save();
+  ctx.fillStyle = color || style.color;
+  ctx.drawImage(maskImages['top-left'], frameRect.x, frameRect.y, cornerSize, cornerSize);
+  ctx.drawImage(maskImages.top, frameRect.x + cornerSize, frameRect.y, edgeWidth, frameWidth);
+  ctx.drawImage(maskImages['top-right'], frameRect.x + frameRect.width - cornerSize, frameRect.y, cornerSize, cornerSize);
+  ctx.drawImage(maskImages.left, frameRect.x, frameRect.y + cornerSize, frameWidth, edgeHeight);
+  ctx.drawImage(maskImages.right, frameRect.x + frameRect.width - frameWidth, frameRect.y + cornerSize, frameWidth, edgeHeight);
+  ctx.drawImage(maskImages['bottom-left'], frameRect.x, frameRect.y + frameRect.height - cornerSize, cornerSize, cornerSize);
+  ctx.drawImage(maskImages.bottom, frameRect.x + cornerSize, frameRect.y + frameRect.height - frameWidth, edgeWidth, frameWidth);
+  ctx.drawImage(maskImages['bottom-right'], frameRect.x + frameRect.width - cornerSize, frameRect.y + frameRect.height - cornerSize, cornerSize, cornerSize);
+  ctx.restore();
+
+  // Keep the photograph itself clean while allowing a restrained, deterministic
+  // inner intrusion so the alpha mask reads as emulsion rather than a sticker.
+  ctx.save();
+  traceSmoothPath(ctx, paths.inner);
+  ctx.clip();
+  ctx.drawImage(image, photoRect.x, photoRect.y, photoRect.width, photoRect.height);
+  ctx.restore();
+
+  if (style.fragmentDensity > 0) {
+    drawFragments(ctx, paths, `${seed}:mask`, color || style.color, style.fragmentDensity * Math.max(0.7, strength));
+  }
+  return { ...paths, maskVariant: selectMaskVariant(styleId, seed) };
 }
 
 function drawFragments(ctx, paths, seed, color, density) {
@@ -264,6 +360,8 @@ module.exports = {
   createSeededRandom,
   generateNormalizedEdgeProfile,
   getCachedNormalizedEdgeProfile,
+  selectMaskVariant,
+  getMaskAssetPaths,
   buildFramePaths,
   traceSmoothPath,
   drawImageWithInnerFrame

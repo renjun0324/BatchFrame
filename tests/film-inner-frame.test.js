@@ -9,7 +9,9 @@ const {
 } = require('../core/frameGeometry');
 const {
   generateNormalizedEdgeProfile,
-  buildFramePaths
+  buildFramePaths,
+  selectMaskVariant,
+  getMaskAssetPaths
 } = require('../core/innerFrameRenderer');
 const { renderComposite } = require('../core/compositeRenderer');
 
@@ -19,6 +21,9 @@ function testDeterminism() {
   const other = generateNormalizedEdgeProfile({ styleId: 'rough-emulsion', seed: 'image-2', strength: 1 });
   assert.deepStrictEqual(first, second, 'same seed must produce the same profile');
   assert.notDeepStrictEqual(first, other, 'different seeds should produce different profiles');
+  assert.strictEqual(selectMaskVariant('darkroom-scan', 'image-1'), selectMaskVariant('darkroom-scan', 'image-1'));
+  assert.notStrictEqual(selectMaskVariant('darkroom-scan', 'image-1'), selectMaskVariant('darkroom-scan', 'image-2'));
+  assert(Object.keys(getMaskAssetPaths('rough-emulsion', 2)).length === 8);
 }
 
 function testPathBoundsAndThickness() {
@@ -117,7 +122,11 @@ function testRenderEntryPoint() {
       enabled: true,
       styleId: 'darkroom-scan',
       widthAt1800: 12,
-      strengthLevel: 'medium'
+      strengthLevel: 'medium',
+      maskImages: {
+        'top-left': {}, top: {}, 'top-right': {}, right: {},
+        'bottom-right': {}, bottom: {}, 'bottom-left': {}, left: {}
+      }
     }
   });
   assert.strictEqual(result.frameWidth, 12);

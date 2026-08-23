@@ -24,20 +24,24 @@ const INNER_FRAME_STYLES = Object.freeze([
   {
     id: 'darkroom-scan',
     name: '暗房扫描边',
-    renderer: 'irregular',
+    renderer: 'mask',
     color: '#050505',
     widthAt1800: 12,
     edgeStrength: 0.18,
-    fragmentDensity: 0
+    fragmentDensity: 0,
+    maskRoot: 'assets/frame-masks/darkroom-scan',
+    maskVariants: 2
   },
   {
     id: 'rough-emulsion',
     name: '粗粝显影边',
-    renderer: 'irregular',
+    renderer: 'mask',
     color: '#030303',
     widthAt1800: 16,
     edgeStrength: 0.42,
-    fragmentDensity: 0.15
+    fragmentDensity: 0.15,
+    maskRoot: 'assets/frame-masks/rough-emulsion',
+    maskVariants: 3
   }
 ]);
 
