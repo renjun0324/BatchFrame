@@ -3,6 +3,8 @@ const { INNER_FRAME_STYLES, EDGE_STRENGTHS, getInnerFrameStyle } = require('../.
 const { renderComposite } = require('../../core/compositeRenderer.js');
 const { selectMaskVariant, getMaskAssetPaths } = require('../../core/innerFrameRenderer.js');
 const { mergeSecurityResults, summarizeSecurity } = require('../../utils/securityPreflight.js');
+const BASIC_FRAME_STYLES = INNER_FRAME_STYLES.filter(style => !style.category || style.category === 'basic-frame');
+const FILM_REBATE_STYLES = INNER_FRAME_STYLES.filter(style => style.category && style.category.indexOf('film-rebate') === 0);
 const sys = wx.getWindowInfo();
 const DPR = sys.pixelRatio || 1;
 
@@ -33,6 +35,25 @@ function imageRecord(path, index) {
   };
 }
 
+function styleControlPatch(style) {
+  const structured = style && style.layoutModel === 'film-rebate';
+  return {
+    currentStyleSupportsStrength: !!(style && style.supportsStrength),
+    currentStyleSupportsColor: !!(style && style.supportsColor),
+    currentStyleIsStructured: structured,
+    currentStyleSupportsFrameSize: !!(style && style.supportsFrameSize),
+    currentStyleSupportsPerforations: !!(style && style.supportsPerforations),
+    currentStyleSupportsEdgeLabel: !!(style && style.supportsEdgeLabel),
+    currentStyleSupportsFrameNumber: !!(style && style.supportsFrameNumber),
+    currentStyleSupportsMarkers: !!(style && style.supportsMarkers),
+    frameSizePreset: structured ? 'standard' : 'standard',
+    framePerforationsEnabled: structured ? style.supportsPerforations !== false : true,
+    frameEdgeLabelEnabled: structured ? style.supportsEdgeLabel !== false : true,
+    frameNumberEnabled: structured ? style.supportsFrameNumber !== false : true,
+    frameMarkersEnabled: structured ? style.supportsMarkers !== false : true
+  };
+}
+
 Page({
   data: {
     images: [],
@@ -47,6 +68,8 @@ Page({
     borderPx: 8,
     innerFrameStyleId: 'clean-black',
     innerFrameStyles: INNER_FRAME_STYLES,
+    basicFrameStyles: BASIC_FRAME_STYLES,
+    filmRebateStyles: FILM_REBATE_STYLES,
     edgeStrengthLevel: 'medium',
     edgeStrengthOptions: EDGE_STRENGTHS,
     activeTool: 'template',
@@ -55,11 +78,26 @@ Page({
     panelScrollTop: 0,
     currentStyleSupportsStrength: false,
     currentStyleSupportsColor: true,
+    currentStyleIsStructured: false,
+    currentStyleSupportsFrameSize: false,
+    currentStyleSupportsPerforations: false,
+    currentStyleSupportsEdgeLabel: false,
+    currentStyleSupportsFrameNumber: false,
+    currentStyleSupportsMarkers: false,
+    frameSizePreset: 'standard',
+    frameSizeOptions: [
+      { id: 'compact', name: '紧凑' },
+      { id: 'standard', name: '标准' }
+    ],
+    framePerforationsEnabled: true,
+    frameEdgeLabelEnabled: true,
+    frameNumberEnabled: true,
+    frameMarkersEnabled: true,
     templates: [
       { id: 'white-clean', name: '白底经典', outerBgColor: '#FFFFFF', styleId: 'clean-black', enableOuterBg: true },
       { id: 'white-scan', name: '白底扫描', outerBgColor: '#FFFFFF', styleId: 'full-frame-scan', enableOuterBg: true },
       { id: 'white-gate', name: '白底片门', outerBgColor: '#FFFFFF', styleId: 'film-gate', enableOuterBg: true },
-      { id: 'white-negative', name: '白底负片', outerBgColor: '#FFFFFF', styleId: 'negative-35mm', enableOuterBg: true },
+      { id: 'white-negative', name: '白底35mm', outerBgColor: '#FFFFFF', styleId: 'film-strip-35mm-full', enableOuterBg: true },
       { id: 'white-emulsion', name: '白底乳剂', outerBgColor: '#FFFFFF', styleId: 'emulsion-damage', enableOuterBg: true },
       { id: 'black-clean', name: '黑底经典', outerBgColor: '#000000', styleId: 'clean-black', enableOuterBg: true },
       { id: 'white-none', name: '白底无框', outerBgColor: '#FFFFFF', styleId: 'none', enableOuterBg: true }
@@ -118,7 +156,8 @@ Page({
       'clean-black': 8,
       'full-frame-scan': 12,
       'film-gate': 24,
-      'negative-35mm': 52,
+      'film-strip-35mm-full': 0,
+      'film-rebate-minimal': 0,
       'medium-format-120': 64,
       'emulsion-damage': 18
     };
@@ -407,11 +446,10 @@ Page({
       outerBgColor: template.outerBgColor,
       canvasBg,
       enableOuterBg: template.enableOuterBg,
-      innerFrameStyleId: template.styleId,
-      enableInnerBorder: template.styleId !== 'none',
+      innerFrameStyleId: style.id,
+      enableInnerBorder: style.id !== 'none',
       borderPx: width,
-      currentStyleSupportsStrength: !!style.supportsStrength,
-      currentStyleSupportsColor: !!style.supportsColor
+      ...styleControlPatch(style)
     }, this.redrawPreview);
   },
 
@@ -615,14 +653,33 @@ Page({
     if (this.data.innerFrameStyleId !== 'none' && this.data.innerFrameStyleId) {
       this._frameWidths[this.data.innerFrameStyleId] = Math.max(0, parseInt(this.data.borderPx, 10) || 0);
     }
-    const width = style.id === 'none' ? 0 : (this._frameWidths[style.id] || style.widthAt1800);
+    const width = style.id === 'none' ? 0 : (this._frameWidths[style.id] || style.widthAt1800 || 0);
     this.setData({
       innerFrameStyleId: style.id,
       borderPx: width,
       enableInnerBorder: style.id !== 'none',
-      currentStyleSupportsStrength: !!style.supportsStrength,
-      currentStyleSupportsColor: !!style.supportsColor
+      ...styleControlPatch(style)
     }, this.redrawPreview);
+  },
+
+  onFrameSizePresetTap(e){
+    this.setData({ frameSizePreset: e.currentTarget.dataset.preset }, this.redrawPreview);
+  },
+
+  toggleFramePerforations(e){
+    this.setData({ framePerforationsEnabled: !!e.detail.value }, this.redrawPreview);
+  },
+
+  toggleFrameEdgeLabel(e){
+    this.setData({ frameEdgeLabelEnabled: !!e.detail.value }, this.redrawPreview);
+  },
+
+  toggleFrameNumber(e){
+    this.setData({ frameNumberEnabled: !!e.detail.value }, this.redrawPreview);
+  },
+
+  toggleFrameMarkers(e){
+    this.setData({ frameMarkersEnabled: !!e.detail.value }, this.redrawPreview);
   },
 
   onEdgeStrengthTap(e){
@@ -641,10 +698,10 @@ Page({
     const patch = { enableInnerBorder: value };
     if (value && this.data.innerFrameStyleId === 'none') {
       const style = getInnerFrameStyle('clean-black');
-      patch.innerFrameStyleId = style.id;
-      patch.borderPx = style.widthAt1800;
-      patch.currentStyleSupportsStrength = !!style.supportsStrength;
-      patch.currentStyleSupportsColor = !!style.supportsColor;
+      Object.assign(patch, {
+        innerFrameStyleId: style.id,
+        borderPx: style.widthAt1800
+      }, styleControlPatch(style));
     }
     this.setData(patch, this.redrawPreview);
   },
@@ -910,7 +967,13 @@ Page({
         enableInnerBorder: this.data.enableInnerBorder,
         innerBorderColor: this.data.innerBorderColor,
         innerFrameStyleId: this.data.innerFrameStyleId,
-        edgeStrengthLevel: this.data.edgeStrengthLevel
+        edgeStrengthLevel: this.data.edgeStrengthLevel,
+        frameSizePreset: this.data.frameSizePreset,
+        framePerforationsEnabled: this.data.framePerforationsEnabled,
+        frameEdgeLabelEnabled: this.data.frameEdgeLabelEnabled,
+        frameNumberEnabled: this.data.frameNumberEnabled,
+        frameMarkersEnabled: this.data.frameMarkersEnabled,
+        frameIndex: this.data.curIndex + 1
       });
     }, 50); // 50ms防抖延迟
   },
@@ -971,7 +1034,13 @@ Page({
     enableInnerBorder,
     innerBorderColor,
     innerFrameStyleId,
-    edgeStrengthLevel
+    edgeStrengthLevel,
+    frameSizePreset = 'standard',
+    framePerforationsEnabled = true,
+    frameEdgeLabelEnabled = true,
+    frameNumberEnabled = true,
+    frameMarkersEnabled = true,
+    frameIndex = 1
   }){
     return new Promise((resolve)=>{
       const isCurrent = () => !renderToken || renderToken === this._renderToken;
@@ -1007,6 +1076,12 @@ Page({
             widthAt1800: borderPx,
             color: innerBorderColor,
             strengthLevel: edgeStrengthLevel,
+            frameSizePreset,
+            perforationsEnabled: framePerforationsEnabled,
+            edgeLabelEnabled: frameEdgeLabelEnabled,
+            frameNumberEnabled,
+            markersEnabled: frameMarkersEnabled,
+            frameIndex,
             maskImages,
             backgroundColor: enableOuterBg ? outerBgColor : 'transparent'
           }
@@ -1121,7 +1196,13 @@ Page({
           enableInnerBorder: this.data.enableInnerBorder,
           innerBorderColor: this.data.innerBorderColor,
           innerFrameStyleId: this.data.innerFrameStyleId,
-          edgeStrengthLevel: this.data.edgeStrengthLevel
+          edgeStrengthLevel: this.data.edgeStrengthLevel,
+          frameSizePreset: this.data.frameSizePreset,
+          framePerforationsEnabled: this.data.framePerforationsEnabled,
+          frameEdgeLabelEnabled: this.data.frameEdgeLabelEnabled,
+          frameNumberEnabled: this.data.frameNumberEnabled,
+          frameMarkersEnabled: this.data.frameMarkersEnabled,
+          frameIndex: i + 1
         });
 
         await new Promise((resolve)=>{

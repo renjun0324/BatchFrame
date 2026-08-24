@@ -164,6 +164,8 @@
 .setting-scroll { height: 100%; box-sizing: border-box; }
 .tool-panel { padding: 11px 14px 14px; box-sizing: border-box; }
 .panel-heading { margin-bottom: 9px; color: #f2f3f5; font-size: 14px; font-weight: 600; }
+.frame-group-title { margin: 8px 0 6px; color: #8f99aa; font-size: 11px; letter-spacing: .04em; }
+.structured-frame-options { margin-top: 8px; padding-top: 8px; border-top: 1px solid #2b303b; }
 .panel-hint { margin-top: 9px; color: #818b9b; font-size: 11px; line-height: 1.45; }
 .field-label { display: block; margin-bottom: 7px; color: #9099a8; font-size: 11px; }
 .chip-row, .template-list, .frame-style-list { white-space: nowrap; }

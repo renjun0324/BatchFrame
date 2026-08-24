@@ -92,8 +92,9 @@
 
       <view wx:if="{{activeTool==='frame'}}" class="tool-panel">
         <view class="panel-heading">内框</view>
+        <view class="frame-group-title">基础内框</view>
         <scroll-view class="frame-style-list" scroll-x>
-            <view wx:for="{{innerFrameStyles}}" wx:key="id"
+            <view wx:for="{{basicFrameStyles}}" wx:key="id"
                   class="frame-style-card {{innerFrameStyleId===item.id?'active':''}}"
                   data-style-id="{{item.id}}" bindtap="onInnerFrameStyleTap">
             <view class="frame-card-sample {{item.id}}">
@@ -102,7 +103,18 @@
             <text>{{item.name}}</text>
           </view>
         </scroll-view>
-        <view class="setting-row" wx:if="{{innerFrameStyleId!=='none'}}">
+        <view class="frame-group-title">片基内框</view>
+        <scroll-view class="frame-style-list" scroll-x>
+          <view wx:for="{{filmRebateStyles}}" wx:key="id"
+                class="frame-style-card {{innerFrameStyleId===item.id?'active':''}}"
+                data-style-id="{{item.id}}" bindtap="onInnerFrameStyleTap">
+            <view class="frame-card-sample {{item.id}}">
+              <image class="frame-card-preview" src="{{item.previewAsset}}" mode="aspectFill"></image>
+            </view>
+            <text>{{item.name}}</text>
+          </view>
+        </scroll-view>
+        <view class="setting-row" wx:if="{{innerFrameStyleId!=='none' && !currentStyleIsStructured}}">
           <text>内框宽度</text>
           <view class="inline-actions">
             <button class="btn ghost mini-btn" bindtap="decBorder">－</button>
@@ -126,6 +138,18 @@
                   style="background:{{color}}" data-color="{{color}}" bindtap="selectInnerColor"></view>
             <view class="color-item custom-color" bindtap="openColorPicker" data-type="inner">+</view>
           </view>
+        </view>
+        <view wx:if="{{currentStyleIsStructured && currentStyleSupportsFrameSize}}" class="structured-frame-options">
+          <view class="field-label">片基尺寸</view>
+          <view class="strength-row">
+            <view wx:for="{{frameSizeOptions}}" wx:key="id"
+                  class="choice-chip {{frameSizePreset===item.id?'active':''}}"
+                  data-preset="{{item.id}}" bindtap="onFrameSizePresetTap">{{item.name}}</view>
+          </view>
+          <view class="setting-row" wx:if="{{currentStyleSupportsPerforations}}"><text>齿孔</text><switch checked="{{framePerforationsEnabled}}" bindchange="toggleFramePerforations" color="#6f8cff"/></view>
+          <view class="setting-row" wx:if="{{currentStyleSupportsEdgeLabel}}"><text>边码</text><switch checked="{{frameEdgeLabelEnabled}}" bindchange="toggleFrameEdgeLabel" color="#6f8cff"/></view>
+          <view class="setting-row" wx:if="{{currentStyleSupportsFrameNumber}}"><text>帧号</text><switch checked="{{frameNumberEnabled}}" bindchange="toggleFrameNumber" color="#6f8cff"/></view>
+          <view class="setting-row" wx:if="{{currentStyleSupportsMarkers}}"><text>角标</text><switch checked="{{frameMarkersEnabled}}" bindchange="toggleFrameMarkers" color="#6f8cff"/></view>
         </view>
         <view class="setting-row">
           <text>启用内框</text>
