@@ -6,7 +6,7 @@ from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parents[1] / "miniprogram" / "assets" / "frame-masks"
-EXPECTED = {"darkroom-scan": 2, "rough-emulsion": 3}
+EXPECTED = {"full-frame-scan": 3, "emulsion-damage": 3}
 SEGMENTS = {"top-left", "top", "top-right", "right", "bottom-right", "bottom", "bottom-left", "left"}
 
 for style, variants in EXPECTED.items():
@@ -20,5 +20,7 @@ for style, variants in EXPECTED.items():
             assert image.mode == "RGBA", (file, image.mode)
             assert image.width > 0 and image.height > 0, file
             assert image.getchannel("A").getbbox(), file
+
+assert {path.name for path in ROOT.iterdir() if path.is_dir()} == set(EXPECTED), "stale or missing production mask style"
 
 print("frame mask asset tests passed")
