@@ -1,4 +1,7 @@
-const { getInnerFrameStyle } = require('./innerFrameStyles');
+const {
+  FRAME_RENDERER_TYPES,
+  getInnerFrameStyle
+} = require('./innerFrameStyles');
 const { clamp, getFrameRect } = require('./frameGeometry');
 
 const PROFILE_CACHE_LIMIT = 128;
@@ -31,51 +34,37 @@ function interpolate(a, b, ratio) {
   return a + (b - a) * ratio;
 }
 
-function generateNormalizedEdgeProfile({
-  styleId = 'clean-black',
-  seed = 'default',
-  strength = 1,
-  pointCount = 32
-} = {}) {
+function usesNormalizedProfile(style) {
+  return style.renderer === FRAME_RENDERER_TYPES.SEGMENTED_MASK ||
+    style.renderer === FRAME_RENDERER_TYPES.EMULSION_MASK;
+}
+
+function generateNormalizedEdgeProfile({ styleId = 'clean-black', seed = 'default', strength = 1, pointCount = 32 } = {}) {
   const style = getInnerFrameStyle(styleId);
   const count = Math.max(8, Math.min(64, Math.floor(pointCount)));
   const effectiveStrength = clamp(Number(strength) || 0, 0, 1.5);
-  const random = createSeededRandom(`${seed}:${style.id}`);
+  const random = createSeededRandom(`${style.id}:${seed}`);
 
   function createSide(sideIndex) {
-    if (!['irregular', 'mask'].includes(style.renderer) || style.edgeStrength <= 0) {
-      return Array.from({ length: count }, (_, index) => ({
-        t: index / (count - 1),
-        value: 0
-      }));
+    if (!usesNormalizedProfile(style)) {
+      return Array.from({ length: count }, (_, index) => ({ t: index / (count - 1), value: 0 }));
     }
-
-    const anchors = 7;
+    const anchors = style.renderer === FRAME_RENDERER_TYPES.EMULSION_MASK ? 9 : 7;
     const anchorValues = Array.from({ length: anchors }, () => random() * 2 - 1);
-    const sideBias = (sideIndex - 1.5) * 0.04;
+    const sideBias = (sideIndex - 1.5) * (style.renderer === FRAME_RENDERER_TYPES.EMULSION_MASK ? 0.09 : 0.04);
     return Array.from({ length: count }, (_, index) => {
       const t = index / (count - 1);
       if (index === 0 || index === count - 1) return { t, value: 0 };
       const scaled = t * (anchors - 1);
       const left = Math.min(anchors - 2, Math.floor(scaled));
       const ratio = scaled - left;
-      const lowFrequency = interpolate(anchorValues[left], anchorValues[left + 1], ratio);
-      const highFrequency = style.fragmentDensity > 0 ? (random() * 2 - 1) * 0.16 : 0;
-      const value = clamp(
-        (lowFrequency * 0.82 + highFrequency + sideBias) * style.edgeStrength * effectiveStrength,
-        -1,
-        1
-      );
-      return { t, value };
+      const low = interpolate(anchorValues[left], anchorValues[left + 1], ratio);
+      const high = style.renderer === FRAME_RENDERER_TYPES.EMULSION_MASK ? (random() * 2 - 1) * 0.2 : 0;
+      return { t, value: clamp((low * 0.86 + high + sideBias) * effectiveStrength, -1, 1) };
     });
   }
 
-  return {
-    top: createSide(0),
-    right: createSide(1),
-    bottom: createSide(2),
-    left: createSide(3)
-  };
+  return { top: createSide(0), right: createSide(1), bottom: createSide(2), left: createSide(3) };
 }
 
 function getCachedNormalizedEdgeProfile(options = {}) {
@@ -88,16 +77,14 @@ function getCachedNormalizedEdgeProfile(options = {}) {
   const profile = generateNormalizedEdgeProfile({ styleId, seed, strength, pointCount });
   profileCache[key] = profile;
   profileCacheOrder.push(key);
-  if (profileCacheOrder.length > PROFILE_CACHE_LIMIT) {
-    delete profileCache[profileCacheOrder.shift()];
-  }
+  if (profileCacheOrder.length > PROFILE_CACHE_LIMIT) delete profileCache[profileCacheOrder.shift()];
   return profile;
 }
 
 function selectMaskVariant(styleId, seed) {
   const style = getInnerFrameStyle(styleId);
   const count = Math.max(1, Number(style.maskVariants) || 1);
-  return hashSeed(`${styleId}:${seed}:mask`) % count + 1;
+  return hashSeed(`${style.id}:${seed}:mask`) % count + 1;
 }
 
 function getMaskAssetPaths(styleId, variant) {
@@ -111,29 +98,19 @@ function getMaskAssetPaths(styleId, variant) {
 }
 
 function edgeValue(profile, side, index) {
-  const points = profile[side];
-  return points[index] ? points[index].value : 0;
+  return profile[side] && profile[side][index] ? profile[side][index].value : 0;
 }
 
-function buildFramePaths({
-  photoRect,
-  frameWidth,
-  styleId = 'clean-black',
-  seed = 'default',
-  strength = 1,
-  pointCount = 32
-} = {}) {
+function buildFramePaths({ photoRect, frameWidth, styleId = 'clean-black', seed = 'default', strength = 1, pointCount = 32 } = {}) {
   const width = Math.max(0, Number(frameWidth) || 0);
   const style = getInnerFrameStyle(styleId);
   if (style.id === 'none' || width <= 0) return null;
-
-  const profile = getCachedNormalizedEdgeProfile({ styleId, seed, strength, pointCount });
-  const outerVariation = width * (0.25 + style.edgeStrength * 0.8);
-  const innerVariation = Math.min(width * 0.28, outerVariation * 0.3);
+  const profile = getCachedNormalizedEdgeProfile({ styleId: style.id, seed, strength, pointCount });
+  const outerVariation = width * (style.renderer === FRAME_RENDERER_TYPES.EMULSION_MASK ? 0.72 : 0.34);
+  const innerVariation = Math.min(width * 0.34, outerVariation * 0.36);
   const count = profile.top.length;
   const outer = [];
   const inner = [];
-
   for (let i = 0; i < count; i += 1) {
     const t = profile.top[i].t;
     const value = edgeValue(profile, 'top', i);
@@ -158,20 +135,10 @@ function buildFramePaths({
     outer.push({ x: photoRect.x - width - value * outerVariation, y: photoRect.y + photoRect.height * t });
     inner.push({ x: photoRect.x + value * innerVariation, y: photoRect.y + photoRect.height * t });
   }
-
-  return {
-    outer,
-    inner,
-    profile,
-    frameRect: getFrameRect(photoRect, width),
-    outerVariation,
-    innerVariation
-  };
+  return { outer, inner, profile, frameRect: getFrameRect(photoRect, width), outerVariation, innerVariation };
 }
 
-function midpoint(a, b) {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-}
+function midpoint(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
 
 function traceSmoothPath(ctx, points) {
   if (!points || points.length < 3) return;
@@ -180,182 +147,220 @@ function traceSmoothPath(ctx, points) {
   ctx.moveTo(firstMid.x, firstMid.y);
   for (let i = 0; i < points.length; i += 1) {
     const current = points[i];
-    const next = points[(i + 1) % points.length];
-    const nextMid = midpoint(current, next);
+    const nextMid = midpoint(current, points[(i + 1) % points.length]);
     ctx.quadraticCurveTo(current.x, current.y, nextMid.x, nextMid.y);
   }
   ctx.closePath();
 }
 
-function drawImageWithInnerFrame({
-  ctx,
-  image,
-  photoRect,
-  frameWidth,
-  styleId = 'clean-black',
-  color,
-  seed = 'default',
-  strength = 1,
-  maskImages
-}) {
-  const style = getInnerFrameStyle(styleId);
-  if (style.id === 'none' || frameWidth <= 0) {
-    ctx.drawImage(image, photoRect.x, photoRect.y, photoRect.width, photoRect.height);
-    return null;
-  }
+function rectanglePaths(photoRect, top, right, bottom, left) {
+  const outer = [
+    { x: photoRect.x - left, y: photoRect.y - top },
+    { x: photoRect.x + photoRect.width + right, y: photoRect.y - top },
+    { x: photoRect.x + photoRect.width + right, y: photoRect.y + photoRect.height + bottom },
+    { x: photoRect.x - left, y: photoRect.y + photoRect.height + bottom }
+  ];
+  const inner = [
+    { x: photoRect.x, y: photoRect.y },
+    { x: photoRect.x + photoRect.width, y: photoRect.y },
+    { x: photoRect.x + photoRect.width, y: photoRect.y + photoRect.height },
+    { x: photoRect.x, y: photoRect.y + photoRect.height }
+  ];
+  return { outer, inner, frameRect: { x: photoRect.x - left, y: photoRect.y - top, width: photoRect.width + left + right, height: photoRect.height + top + bottom } };
+}
 
-  if (style.renderer === 'clean') {
-    ctx.fillStyle = color || style.color;
-    ctx.fillRect(
-      photoRect.x - frameWidth,
-      photoRect.y - frameWidth,
-      photoRect.width + frameWidth * 2,
-      photoRect.height + frameWidth * 2
-    );
-    ctx.drawImage(image, photoRect.x, photoRect.y, photoRect.width, photoRect.height);
-    return {
-      outer: [
-        { x: photoRect.x - frameWidth, y: photoRect.y - frameWidth },
-        { x: photoRect.x + photoRect.width + frameWidth, y: photoRect.y - frameWidth },
-        { x: photoRect.x + photoRect.width + frameWidth, y: photoRect.y + photoRect.height + frameWidth },
-        { x: photoRect.x - frameWidth, y: photoRect.y + photoRect.height + frameWidth }
-      ],
-      inner: [
-        { x: photoRect.x, y: photoRect.y },
-        { x: photoRect.x + photoRect.width, y: photoRect.y },
-        { x: photoRect.x + photoRect.width, y: photoRect.y + photoRect.height },
-        { x: photoRect.x, y: photoRect.y + photoRect.height }
-      ],
-      frameRect: getFrameRect(photoRect, frameWidth)
-    };
-  }
-
-  if (style.renderer === 'mask') {
-    if (maskImages && MASK_SEGMENTS.every(segment => maskImages[segment])) {
-      return drawImageWithSegmentedMask({
-        ctx,
-        image,
-        photoRect,
-        frameWidth,
-        styleId,
-        color,
-        seed,
-        strength,
-        maskImages
-      });
-    }
-    // A missing local asset must remain usable and visibly safe. Fall back to
-    // the clean rectangular frame rather than recreating the old random edge.
-    ctx.fillStyle = color || style.color;
-    ctx.fillRect(
-      photoRect.x - frameWidth,
-      photoRect.y - frameWidth,
-      photoRect.width + frameWidth * 2,
-      photoRect.height + frameWidth * 2
-    );
-    ctx.drawImage(image, photoRect.x, photoRect.y, photoRect.width, photoRect.height);
-    return null;
-  }
-
-  const paths = buildFramePaths({ photoRect, frameWidth, styleId, seed, strength });
+function fillAndClipPhoto(ctx, image, photoRect, paths, color) {
   ctx.save();
   traceSmoothPath(ctx, paths.outer);
-  ctx.fillStyle = color || style.color;
+  ctx.fillStyle = color;
   ctx.fill();
   ctx.restore();
-
   ctx.save();
   traceSmoothPath(ctx, paths.inner);
   ctx.clip();
   ctx.drawImage(image, photoRect.x, photoRect.y, photoRect.width, photoRect.height);
   ctx.restore();
+}
 
-  if (style.fragmentDensity > 0) {
-    drawFragments(ctx, paths, seed, color || style.color, style.fragmentDensity);
-  }
+function drawWithoutFrame({ ctx, image, photoRect }) {
+  ctx.drawImage(image, photoRect.x, photoRect.y, photoRect.width, photoRect.height);
+  return null;
+}
+
+function drawCleanFrame({ ctx, image, photoRect, frameWidth, color }) {
+  const paths = rectanglePaths(photoRect, frameWidth, frameWidth, frameWidth, frameWidth);
+  fillAndClipPhoto(ctx, image, photoRect, paths, color);
   return paths;
 }
 
-function drawImageWithSegmentedMask({
-  ctx,
-  image,
-  photoRect,
-  frameWidth,
-  styleId,
-  color,
-  seed,
-  strength,
-  maskImages
-}) {
+function drawSegmentedMaskFrame({ ctx, image, photoRect, frameWidth, color, styleId, seed, strength, maskImages }) {
+  if (!maskImages || !MASK_SEGMENTS.every(segment => maskImages[segment])) return drawCleanFrame({ ctx, image, photoRect, frameWidth, color });
   const style = getInnerFrameStyle(styleId);
   const frameRect = getFrameRect(photoRect, frameWidth);
   const cornerSize = Math.max(frameWidth * 3.2, 12);
   const edgeWidth = Math.max(1, frameRect.width - cornerSize * 2);
   const edgeHeight = Math.max(1, frameRect.height - cornerSize * 2);
-  const paths = buildFramePaths({
-    photoRect,
-    frameWidth,
-    styleId,
-    seed,
-    strength: Math.max(0.45, strength),
-    pointCount: 32
-  });
-
+  const boxes = {
+    'top-left': [frameRect.x, frameRect.y, cornerSize, cornerSize],
+    top: [frameRect.x + cornerSize, frameRect.y, edgeWidth, frameWidth],
+    'top-right': [frameRect.x + frameRect.width - cornerSize, frameRect.y, cornerSize, cornerSize],
+    right: [frameRect.x + frameRect.width - frameWidth, frameRect.y + cornerSize, frameWidth, edgeHeight],
+    'bottom-right': [frameRect.x + frameRect.width - cornerSize, frameRect.y + frameRect.height - cornerSize, cornerSize, cornerSize],
+    bottom: [frameRect.x + cornerSize, frameRect.y + frameRect.height - frameWidth, edgeWidth, frameWidth],
+    'bottom-left': [frameRect.x, frameRect.y + frameRect.height - cornerSize, cornerSize, cornerSize],
+    left: [frameRect.x, frameRect.y + cornerSize, frameWidth, edgeHeight]
+  };
   ctx.save();
-  ctx.fillStyle = color || style.color;
-  ctx.drawImage(maskImages['top-left'], frameRect.x, frameRect.y, cornerSize, cornerSize);
-  ctx.drawImage(maskImages.top, frameRect.x + cornerSize, frameRect.y, edgeWidth, frameWidth);
-  ctx.drawImage(maskImages['top-right'], frameRect.x + frameRect.width - cornerSize, frameRect.y, cornerSize, cornerSize);
-  ctx.drawImage(maskImages.left, frameRect.x, frameRect.y + cornerSize, frameWidth, edgeHeight);
-  ctx.drawImage(maskImages.right, frameRect.x + frameRect.width - frameWidth, frameRect.y + cornerSize, frameWidth, edgeHeight);
-  ctx.drawImage(maskImages['bottom-left'], frameRect.x, frameRect.y + frameRect.height - cornerSize, cornerSize, cornerSize);
-  ctx.drawImage(maskImages.bottom, frameRect.x + cornerSize, frameRect.y + frameRect.height - frameWidth, edgeWidth, frameWidth);
-  ctx.drawImage(maskImages['bottom-right'], frameRect.x + frameRect.width - cornerSize, frameRect.y + frameRect.height - cornerSize, cornerSize, cornerSize);
+  ctx.fillStyle = color;
+  MASK_SEGMENTS.forEach(segment => {
+    const box = boxes[segment];
+    ctx.drawImage(maskImages[segment], box[0], box[1], box[2], box[3]);
+  });
   ctx.restore();
-
-  // Keep the photograph itself clean while allowing a restrained, deterministic
-  // inner intrusion so the alpha mask reads as emulsion rather than a sticker.
+  const paths = buildFramePaths({ photoRect, frameWidth, styleId: style.id, seed, strength: Math.max(0.55, strength), pointCount: 32 });
   ctx.save();
   traceSmoothPath(ctx, paths.inner);
   ctx.clip();
   ctx.drawImage(image, photoRect.x, photoRect.y, photoRect.width, photoRect.height);
   ctx.restore();
+  return { ...paths, maskVariant: selectMaskVariant(style.id, seed) };
+}
 
-  if (style.fragmentDensity > 0) {
-    drawFragments(ctx, paths, `${seed}:mask`, color || style.color, style.fragmentDensity * Math.max(0.7, strength));
+function drawEmulsionDamageFrame(options) {
+  const paths = drawSegmentedMaskFrame(options);
+  if (!paths || !paths.outer) return paths;
+  drawFragments(options.ctx, paths, `${options.seed}:emulsion`, options.color, 0.12 * Math.max(0.7, options.strength));
+  return paths;
+}
+
+function drawFilmGateFrame({ ctx, image, photoRect, frameWidth, color, seed }) {
+  const random = createSeededRandom(`${seed}:film-gate`);
+  const top = frameWidth * (0.76 + random() * 0.12);
+  const right = frameWidth * (1.02 + random() * 0.16);
+  const bottom = frameWidth * (1.18 + random() * 0.16);
+  const left = frameWidth * (1.08 + random() * 0.18);
+  const paths = rectanglePaths(photoRect, top, right, bottom, left);
+  fillAndClipPhoto(ctx, image, photoRect, paths, color);
+  // Hard片门 corners: a small deterministic accumulation, not random noise.
+  ctx.save();
+  ctx.fillStyle = color;
+  const corner = Math.max(2, frameWidth * 0.55);
+  ctx.fillRect(photoRect.x - left, photoRect.y - top, corner, corner);
+  ctx.fillRect(photoRect.x + photoRect.width + right - corner, photoRect.y + photoRect.height + bottom - corner, corner, corner);
+  ctx.restore();
+  return { ...paths, variant: hashSeed(`${seed}:film-gate`) % 3 + 1 };
+}
+
+function drawCutout(ctx, x, y, width, height, backgroundColor) {
+  if (backgroundColor && backgroundColor !== 'transparent') {
+    ctx.fillStyle = backgroundColor;
+    ctx.fillRect(x, y, width, height);
+    return;
   }
-  return { ...paths, maskVariant: selectMaskVariant(styleId, seed) };
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillRect(x, y, width, height);
+  ctx.restore();
+}
+
+function drawPerforations(ctx, frameRect, frameWidth, backgroundColor, seed) {
+  const holeWidth = clamp(frameWidth * 0.58, 3, 18);
+  const holeHeight = clamp(frameWidth * 0.44, 3, 14);
+  const gap = Math.max(holeWidth * 1.28, frameWidth * 0.9);
+  const startOffset = (hashSeed(`${seed}:perforations`) % Math.max(1, Math.round(gap))) - gap / 2;
+  const count = Math.ceil((frameRect.width + gap) / gap);
+  for (let i = 0; i < count; i += 1) {
+    const x = frameRect.x + startOffset + i * gap;
+    drawCutout(ctx, x, frameRect.y + frameWidth * 0.25, holeWidth, holeHeight, backgroundColor);
+    drawCutout(ctx, x, frameRect.y + frameRect.height - frameWidth * 0.25 - holeHeight, holeWidth, holeHeight, backgroundColor);
+  }
+}
+
+function drawFrameCode(ctx, frameRect, frameWidth, seed, backgroundColor) {
+  if (typeof ctx.fillText !== 'function') return;
+  ctx.save();
+  ctx.fillStyle = backgroundColor && backgroundColor !== 'transparent' ? backgroundColor : '#FFFFFF';
+  ctx.font = `${Math.max(8, Math.round(frameWidth * 0.38))}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${String(hashSeed(`${seed}:frame`) % 90 + 10).padStart(2, '0')}A`, frameRect.x + frameRect.width / 2, frameRect.y + frameWidth * 0.72);
+  ctx.restore();
+}
+
+function drawPerforatedFilmFrame({ ctx, image, photoRect, frameWidth, color, seed, backgroundColor }) {
+  const paths = rectanglePaths(photoRect, frameWidth, frameWidth, frameWidth, frameWidth);
+  fillAndClipPhoto(ctx, image, photoRect, paths, color);
+  drawPerforations(ctx, paths.frameRect, frameWidth, backgroundColor, seed);
+  drawFrameCode(ctx, paths.frameRect, frameWidth, seed, backgroundColor);
+  return { ...paths, perforationPitch: Math.max(frameWidth * 1.28, frameWidth * 0.9) };
+}
+
+function drawMediumFormatFrame({ ctx, image, photoRect, frameWidth, color, seed, backgroundColor }) {
+  const random = createSeededRandom(`${seed}:medium-format`);
+  const top = frameWidth * (0.9 + random() * 0.12);
+  const right = frameWidth * (1.05 + random() * 0.14);
+  const bottom = frameWidth * (1.28 + random() * 0.16);
+  const left = frameWidth * (1.5 + random() * 0.2);
+  const paths = rectanglePaths(photoRect, top, right, bottom, left);
+  fillAndClipPhoto(ctx, image, photoRect, paths, color);
+  ctx.save();
+  ctx.fillStyle = backgroundColor && backgroundColor !== 'transparent' ? backgroundColor : '#FFFFFF';
+  if (typeof ctx.arc === 'function') {
+    ctx.beginPath();
+    ctx.arc(photoRect.x - left * 0.5, photoRect.y + photoRect.height * 0.5, Math.max(2, frameWidth * 0.18), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  drawFrameCode(ctx, paths.frameRect, frameWidth, `${seed}:120`, backgroundColor);
+  ctx.restore();
+  return { ...paths, mediumFormat: true };
 }
 
 function drawFragments(ctx, paths, seed, color, density) {
   const random = createSeededRandom(`${seed}:fragments`);
-  const count = Math.max(2, Math.round(density * 48));
+  const count = Math.max(2, Math.round(density * 72));
   ctx.save();
   ctx.fillStyle = color;
   for (let i = 0; i < count; i += 1) {
     const start = Math.floor(random() * paths.outer.length);
     const point = paths.outer[start];
     const next = paths.outer[(start + 1) % paths.outer.length];
-    const size = 0.3 + random() * 1.2;
+    const size = 0.5 + random() * 2.2;
     const dx = next.x - point.x;
     const dy = next.y - point.y;
     const length = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-    const nx = -dy / length;
-    const ny = dx / length;
     const along = random();
     const x = point.x + dx * along;
     const y = point.y + dy * along;
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.lineTo(x + nx * size, y + ny * size);
-    ctx.lineTo(x + nx * size * 0.3 + dx / length * size, y + ny * size * 0.3 + dy / length * size);
+    ctx.lineTo(x - dy / length * size, y + dx / length * size);
+    ctx.lineTo(x + dx / length * size, y + dy / length * size);
     ctx.closePath();
     ctx.fill();
   }
   ctx.restore();
 }
 
+const FRAME_RENDERERS = Object.freeze({
+  [FRAME_RENDERER_TYPES.NONE]: drawWithoutFrame,
+  [FRAME_RENDERER_TYPES.CLEAN]: drawCleanFrame,
+  [FRAME_RENDERER_TYPES.SEGMENTED_MASK]: drawSegmentedMaskFrame,
+  [FRAME_RENDERER_TYPES.FILM_GATE]: drawFilmGateFrame,
+  [FRAME_RENDERER_TYPES.PERFORATED_FILM]: drawPerforatedFilmFrame,
+  [FRAME_RENDERER_TYPES.MEDIUM_FORMAT_REBATE]: drawMediumFormatFrame,
+  [FRAME_RENDERER_TYPES.EMULSION_MASK]: drawEmulsionDamageFrame
+});
+
+function drawImageWithInnerFrame(options) {
+  const style = getInnerFrameStyle(options.styleId || 'clean-black');
+  const renderer = FRAME_RENDERERS[style.renderer] || FRAME_RENDERERS[FRAME_RENDERER_TYPES.CLEAN];
+  const result = renderer({ ...options, styleId: style.id, color: options.color || style.color });
+  return result;
+}
+
 module.exports = {
+  FRAME_RENDERERS,
+  MASK_SEGMENTS,
   hashSeed,
   createSeededRandom,
   generateNormalizedEdgeProfile,
@@ -364,5 +369,10 @@ module.exports = {
   getMaskAssetPaths,
   buildFramePaths,
   traceSmoothPath,
-  drawImageWithInnerFrame
+  drawImageWithInnerFrame,
+  drawImageWithSegmentedMask: drawSegmentedMaskFrame,
+  drawFilmGateFrame,
+  drawPerforatedFilmFrame,
+  drawMediumFormatFrame,
+  drawEmulsionDamageFrame
 };

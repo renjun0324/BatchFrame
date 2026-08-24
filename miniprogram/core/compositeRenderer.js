@@ -62,7 +62,8 @@ function renderComposite({
     color: enabled ? frameColor : undefined,
     seed: imageSeed || imageId || 'default',
     strength,
-    maskImages: innerFrameSettings.maskImages
+    maskImages: innerFrameSettings.maskImages,
+    backgroundColor: outerBackgroundSettings.enabled ? outerBackgroundSettings.color : 'transparent'
   });
 
   return {
