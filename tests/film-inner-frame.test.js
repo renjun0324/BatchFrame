@@ -1,4 +1,6 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const {
   FRAME_RENDERER_TYPES,
   INNER_FRAME_STYLES,
@@ -33,6 +35,9 @@ function testStyleRegistry() {
   INNER_FRAME_STYLES.forEach(style => {
     assert(FRAME_RENDERERS[style.renderer], `${style.id} must have a renderer`);
     assert(style.supportedRatios.length > 0);
+    const previewPath = path.join(__dirname, '..', 'miniprogram', style.previewAsset.replace(/^\//, ''));
+    assert(fs.existsSync(previewPath), `${style.id} selector preview must exist`);
+    assert(fs.statSync(previewPath).size > 0, `${style.id} selector preview must be non-empty`);
     if (style.id === 'film-gate') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.FILM_GATE);
     if (style.id === 'negative-35mm') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.PERFORATED_FILM);
     if (style.id === 'medium-format-120') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.MEDIUM_FORMAT_REBATE);
