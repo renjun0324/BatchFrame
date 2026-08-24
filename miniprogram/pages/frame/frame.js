@@ -97,6 +97,7 @@ Page({
     templates: [
       { id: 'white-clean', name: '白底经典', outerBgColor: '#FFFFFF', styleId: 'clean-black', enableOuterBg: true },
       { id: 'white-scan', name: '白底扫描', outerBgColor: '#FFFFFF', styleId: 'full-frame-scan', enableOuterBg: true },
+      { id: 'white-scan-emulsion', name: '白底原片', outerBgColor: '#FFFFFF', styleId: 'scan-emulsion-edge', enableOuterBg: true },
       { id: 'white-gate', name: '白底片门', outerBgColor: '#FFFFFF', styleId: 'film-gate', enableOuterBg: true },
       { id: 'white-negative', name: '白底35mm', outerBgColor: '#FFFFFF', styleId: 'film-strip-35mm-full', enableOuterBg: true },
       { id: 'white-emulsion', name: '白底乳剂', outerBgColor: '#FFFFFF', styleId: 'emulsion-damage', enableOuterBg: true },
@@ -160,6 +161,7 @@ Page({
     this._frameWidths = {
       'clean-black': 8,
       'full-frame-scan': 12,
+      'scan-emulsion-edge': 18,
       'film-gate': 24,
       'film-strip-35mm-full': 0,
       'film-rebate-minimal': 0,
@@ -968,10 +970,12 @@ Page({
   },
 
   loadFrameMasks(canvas, styleId, seed, strengthLevel = 'medium'){
+    const style = getInnerFrameStyle(styleId);
+    const strengthKey = style.supportsStrength ? strengthLevel : 'fixed';
     const variant = selectMaskVariant(styleId, seed || 'default', strengthLevel);
     const paths = getMaskAssetPaths(styleId, variant, strengthLevel);
     if (!paths) return Promise.resolve(null);
-    const cacheKey = `${styleId}:${strengthLevel}:${variant}`;
+    const cacheKey = `${style.id}:${strengthKey}:${variant}`;
     if (this._frameMaskCache && this._frameMaskCache[cacheKey]) {
       return Promise.resolve(this._frameMaskCache[cacheKey]);
     }
