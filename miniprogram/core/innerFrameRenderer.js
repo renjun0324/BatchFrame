@@ -87,16 +87,22 @@ function getCachedNormalizedEdgeProfile(options = {}) {
 function selectMaskVariant(styleId, seed, strengthLevel = 'medium') {
   const style = getInnerFrameStyle(styleId);
   const count = Math.max(1, Number(style.maskVariants) || 1);
-  return hashSeed(`${style.id}:${strengthLevel}:${seed}:mask`) % count + 1;
+  // A hidden stale strength value must not alter a fixed material style.
+  const strengthKey = style.supportsStrength ? strengthLevel : 'fixed';
+  return hashSeed(`${style.id}:${strengthKey}:${seed}:mask`) % count + 1;
 }
 
 function getMaskAssetPaths(styleId, variant, strengthLevel = 'medium') {
   const style = getInnerFrameStyle(styleId);
   if (!style.maskRoot || !style.maskVariants) return null;
   const selected = Math.max(1, Math.min(style.maskVariants, Number(variant) || 1));
+  const variantFolder = `variant-${String(selected).padStart(2, '0')}`;
   const tier = getStrengthPreset(style.id, strengthLevel).maskTier || strengthLevel;
+  const basePath = style.maskTiered === false
+    ? `/${style.maskRoot}/${variantFolder}`
+    : `/${style.maskRoot}/${tier}/${variantFolder}`;
   return MASK_SEGMENTS.reduce((result, segment) => {
-    result[segment] = `/${style.maskRoot}/${tier}/variant-${String(selected).padStart(2, '0')}/${segment}.png`;
+    result[segment] = `${basePath}/${segment}.png`;
     return result;
   }, {});
 }
@@ -270,6 +276,63 @@ function drawEmulsionDamageFrame(options) {
   const preset = getStrengthPreset('emulsion-damage', options.strengthLevel || 'medium');
   drawFragments(options.ctx, paths, `${options.seed}:emulsion`, options.color, preset.fragmentDensity, preset.fragmentSize);
   return paths;
+}
+
+function getScanEmulsionSideWidths(frameWidth, style) {
+  const scale = Math.max(0, Number(frameWidth) || 0) /
+    Math.max(1, Number(style && style.widthAt1800) || 18);
+  return {
+    top: 18 * scale,
+    right: 14 * scale,
+    bottom: 20 * scale,
+    left: 14 * scale
+  };
+}
+
+function drawScanEmulsionTextures(ctx, maskImages, frameRect, sideWidths) {
+  if (!maskImages || !MASK_SEGMENTS.every(segment => maskImages[segment])) return;
+  const top = sideWidths.top;
+  const right = sideWidths.right;
+  const bottom = sideWidths.bottom;
+  const left = sideWidths.left;
+  const outside = Math.max(3, Math.max(top, bottom) * 0.74);
+  const corner = Math.max(10, Math.max(top, bottom) * 2.05);
+  const horizontalWidth = Math.max(1, frameRect.width - corner * 2);
+  const verticalHeight = Math.max(1, frameRect.height - corner * 2);
+  // The residue overlaps only the outer portion of the black body and extends
+  // outward. It never becomes a photo clip, so the aperture remains rectangular.
+  const boxes = {
+    'top-left': [frameRect.x - outside, frameRect.y - outside, corner, corner],
+    top: [frameRect.x + corner, frameRect.y - outside, horizontalWidth, outside + top * 0.5],
+    'top-right': [frameRect.x + frameRect.width - corner, frameRect.y - outside, corner, corner],
+    right: [frameRect.x + frameRect.width - right * 0.46, frameRect.y + corner, right * 0.46 + outside, verticalHeight],
+    'bottom-right': [frameRect.x + frameRect.width - corner, frameRect.y + frameRect.height - corner, corner, corner],
+    bottom: [frameRect.x + corner, frameRect.y + frameRect.height - bottom * 0.5, horizontalWidth, bottom * 0.5 + outside],
+    'bottom-left': [frameRect.x - outside, frameRect.y + frameRect.height - corner, corner, corner],
+    left: [frameRect.x - outside, frameRect.y + corner, left * 0.46 + outside, verticalHeight]
+  };
+  ctx.save();
+  MASK_SEGMENTS.forEach(segment => {
+    const box = boxes[segment];
+    ctx.drawImage(maskImages[segment], box[0], box[1], box[2], box[3]);
+  });
+  ctx.restore();
+}
+
+// A scanned original is intentionally not an irregular picture aperture. The
+// black frame is a hard, continuous mount; only its *outside* carries sparse
+// warm emulsion residue from the scan/film edge.
+function drawScanEmulsionEdgeFrame({ ctx, image, photoRect, frameWidth, color, styleId, seed, strengthLevel, maskImages }) {
+  const style = getInnerFrameStyle(styleId || 'scan-emulsion-edge');
+  const sideWidths = getScanEmulsionSideWidths(frameWidth, style);
+  const paths = rectanglePaths(photoRect, sideWidths.top, sideWidths.right, sideWidths.bottom, sideWidths.left);
+  fillHardFrameAndPhoto(ctx, image, photoRect, paths, color || style.color);
+  drawScanEmulsionTextures(ctx, maskImages, paths.frameRect, sideWidths);
+  return {
+    ...paths,
+    sideWidths,
+    maskVariant: selectMaskVariant(style.id, seed, strengthLevel)
+  };
 }
 
 function drawFilmGateFrame({ ctx, image, photoRect, frameWidth, color, seed }) {
@@ -483,6 +546,7 @@ const FRAME_RENDERERS = Object.freeze({
   [FRAME_RENDERER_TYPES.PERFORATED_FILM]: drawPerforatedFilmFrame,
   [FRAME_RENDERER_TYPES.MEDIUM_FORMAT_REBATE]: drawMediumFormatFrame,
   [FRAME_RENDERER_TYPES.EMULSION_MASK]: drawEmulsionDamageFrame,
+  [FRAME_RENDERER_TYPES.SCAN_EMULSION_EDGE]: drawScanEmulsionEdgeFrame,
   [FRAME_RENDERER_TYPES.FILM_REBATE_LAYOUT]: drawFilmRebateLayoutFrame
 });
 
@@ -513,5 +577,7 @@ module.exports = {
   drawPerforatedFilmFrame,
   drawMediumFormatFrame,
   drawEmulsionDamageFrame,
+  drawScanEmulsionEdgeFrame,
+  getScanEmulsionSideWidths,
   drawFilmRebateLayoutFrame
 };

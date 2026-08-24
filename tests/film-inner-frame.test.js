@@ -17,7 +17,8 @@ const {
   selectMaskVariant,
   getMaskAssetPaths,
   FRAME_RENDERERS,
-  drawImageWithInnerFrame
+  drawImageWithInnerFrame,
+  getScanEmulsionSideWidths
 } = require('../miniprogram/core/innerFrameRenderer');
 const { renderComposite } = require('../miniprogram/core/compositeRenderer');
 
@@ -33,10 +34,22 @@ function testDeterminism() {
     getMaskAssetPaths('emulsion-damage', 2, 'light').top,
     getMaskAssetPaths('emulsion-damage', 2, 'strong').top
   );
+  assert.notStrictEqual(
+    getMaskAssetPaths('full-frame-scan', 2, 'light').top,
+    getMaskAssetPaths('full-frame-scan', 2, 'strong').top,
+    'tiered scan masks must retain distinct tiers'
+  );
+  assert.strictEqual(
+    selectMaskVariant('scan-emulsion-edge', 'image-1', 'light'),
+    selectMaskVariant('scan-emulsion-edge', 'image-1', 'strong'),
+    'fixed scan-emulsion materials must ignore stale strength state'
+  );
+  assert(!getMaskAssetPaths('scan-emulsion-edge', 2, 'light').top.includes('/light/'));
+  assert(!getMaskAssetPaths('scan-emulsion-edge', 2, 'strong').top.includes('/strong/'));
 }
 
 function testStyleRegistry() {
-  const expected = ['none', 'clean-black', 'full-frame-scan', 'film-gate', 'film-strip-35mm-full', 'film-rebate-minimal', 'medium-format-120', 'emulsion-damage'];
+  const expected = ['none', 'clean-black', 'full-frame-scan', 'scan-emulsion-edge', 'film-gate', 'film-strip-35mm-full', 'film-rebate-minimal', 'medium-format-120', 'emulsion-damage'];
   assert.deepStrictEqual(INNER_FRAME_STYLES.map(style => style.id), expected);
   INNER_FRAME_STYLES.forEach(style => {
     assert(FRAME_RENDERERS[style.renderer], `${style.id} must have a renderer`);
@@ -45,6 +58,13 @@ function testStyleRegistry() {
     assert(fs.existsSync(previewPath), `${style.id} selector preview must exist`);
     assert(fs.statSync(previewPath).size > 0, `${style.id} selector preview must be non-empty`);
     if (style.id === 'film-gate') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.FILM_GATE);
+    if (style.id === 'scan-emulsion-edge') {
+      assert.strictEqual(style.category, 'basic-frame');
+      assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.SCAN_EMULSION_EDGE);
+      assert.strictEqual(style.supportsStrength, false);
+      assert.notStrictEqual(style.layoutModel, 'film-rebate');
+      assert.strictEqual(style.maskTiered, false);
+    }
     if (style.id === 'film-strip-35mm-full') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.FILM_REBATE_LAYOUT);
     if (style.id === 'film-rebate-minimal') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.FILM_REBATE_LAYOUT);
     if (style.id === 'medium-format-120') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.MEDIUM_FORMAT_REBATE);
@@ -182,7 +202,7 @@ function testDedicatedRenderers() {
     'top-left': {}, top: {}, 'top-right': {}, right: {},
     'bottom-right': {}, bottom: {}, 'bottom-left': {}, left: {}
   };
-  ['film-gate', 'film-strip-35mm-full', 'film-rebate-minimal', 'medium-format-120', 'emulsion-damage'].forEach(styleId => {
+  ['film-gate', 'film-strip-35mm-full', 'film-rebate-minimal', 'medium-format-120', 'emulsion-damage', 'scan-emulsion-edge'].forEach(styleId => {
     const result = renderComposite({
       ctx, outWidth: 1800, outHeight: 1200, image, imageId: styleId,
       imageSeed: 'stable-seed',
@@ -214,7 +234,7 @@ function recordingContext() {
 function testHardRenderersKeepRectangularWindows() {
   const image = { width: 1200, height: 800 };
   const photoRect = { x: 300, y: 240, width: 900, height: 600 };
-  ['clean-black', 'film-gate', 'medium-format-120'].forEach(styleId => {
+  ['clean-black', 'film-gate', 'medium-format-120', 'scan-emulsion-edge'].forEach(styleId => {
     const { ctx, calls } = recordingContext();
     drawImageWithInnerFrame({
       ctx, image, photoRect, frameWidth: getInnerFrameStyle(styleId).widthAt1800,
@@ -225,6 +245,32 @@ function testHardRenderersKeepRectangularWindows() {
     assert(draw, `${styleId} must draw the photo`);
     assert.deepStrictEqual(draw.args.slice(-4), [photoRect.x, photoRect.y, photoRect.width, photoRect.height]);
   });
+}
+
+function testScanEmulsionGeometry() {
+  const style = getInnerFrameStyle('scan-emulsion-edge');
+  const sides = getScanEmulsionSideWidths(18, style);
+  assert(sides.bottom >= sides.top, 'bottom scan residue rail must be at least as deep as top');
+  assert(sides.top > sides.left, 'top scan rail must remain stronger than left');
+  assert(sides.top > sides.right, 'top scan rail must remain stronger than right');
+  const widened = getScanEmulsionSideWidths(27, style);
+  assert.strictEqual(widened.top, 27);
+  assert.strictEqual(widened.bottom, 30);
+  const { ctx, calls } = recordingContext();
+  const image = { width: 1200, height: 800 };
+  const photoRect = { x: 300, y: 240, width: 900, height: 600 };
+  const maskImages = {
+    'top-left': {}, top: {}, 'top-right': {}, right: {},
+    'bottom-right': {}, bottom: {}, 'bottom-left': {}, left: {}
+  };
+  drawImageWithInnerFrame({
+    ctx, image, photoRect, frameWidth: 18, styleId: style.id, seed: 'scan-shape',
+    color: style.color, maskImages, strengthLevel: 'strong'
+  });
+  assert(!calls.some(call => call.name === 'quadraticCurveTo' || call.name === 'bezierCurveTo'));
+  const draw = calls.find(call => call.name === 'drawImage' && call.args[0] === image);
+  assert(draw, 'scan emulsion edge must still draw the photo');
+  assert.deepStrictEqual(draw.args.slice(-4), [photoRect.x, photoRect.y, photoRect.width, photoRect.height]);
 }
 
 function testStrengthSemantics() {
@@ -249,4 +295,5 @@ testRenderEntryPoint();
 testDedicatedRenderers();
 testHardRenderersKeepRectangularWindows();
 testStrengthSemantics();
+testScanEmulsionGeometry();
 console.log('film inner frame tests passed');

@@ -10,6 +10,7 @@ const FRAME_RENDERER_TYPES = Object.freeze({
   PERFORATED_FILM: 'perforated-film',
   MEDIUM_FORMAT_REBATE: 'medium-format-rebate',
   EMULSION_MASK: 'emulsion-mask',
+  SCAN_EMULSION_EDGE: 'scan-emulsion-edge',
   FILM_REBATE_LAYOUT: 'film-rebate-layout'
 });
 
@@ -43,8 +44,16 @@ const INNER_FRAME_STYLES = Object.freeze([
     id: 'full-frame-scan', name: '全幅扫描边', renderer: FRAME_RENDERER_TYPES.SEGMENTED_MASK,
     color: '#050505', widthAt1800: 12, supportsStrength: true, supportsColor: false,
     strengthPresets: MATERIAL_STRENGTH_PRESETS['full-frame-scan'],
-    maskRoot: 'assets/frame-masks/full-frame-scan', maskVariants: 3,
+    maskRoot: 'assets/frame-masks/full-frame-scan', maskVariants: 3, maskTiered: true,
     previewAsset: '/assets/frame-previews/full-frame-scan.png',
+    supportedRatios: ['1:1', '2:3', '3:4', '4:5', '9:16', '16:9']
+  },
+  {
+    id: 'scan-emulsion-edge', name: '原片扫描黑边', category: 'basic-frame',
+    renderer: FRAME_RENDERER_TYPES.SCAN_EMULSION_EDGE,
+    color: '#050505', widthAt1800: 18, supportsStrength: false, supportsColor: false,
+    maskRoot: 'assets/frame-masks/scan-emulsion-edge', maskVariants: 3, maskTiered: false,
+    previewAsset: '/assets/frame-previews/scan-emulsion-edge.png',
     supportedRatios: ['1:1', '2:3', '3:4', '4:5', '9:16', '16:9']
   },
   {
@@ -119,7 +128,7 @@ const INNER_FRAME_STYLES = Object.freeze([
     id: 'emulsion-damage', name: '乳剂破损边', renderer: FRAME_RENDERER_TYPES.EMULSION_MASK,
     color: '#030303', widthAt1800: 18, supportsStrength: true, supportsColor: false,
     strengthPresets: MATERIAL_STRENGTH_PRESETS['emulsion-damage'],
-    maskRoot: 'assets/frame-masks/emulsion-damage', maskVariants: 3,
+    maskRoot: 'assets/frame-masks/emulsion-damage', maskVariants: 3, maskTiered: true,
     previewAsset: '/assets/frame-previews/emulsion-damage.png',
     supportedRatios: ['1:1', '2:3', '3:4', '4:5', '9:16', '16:9']
   }
