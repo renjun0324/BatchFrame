@@ -1,5 +1,6 @@
 const assert = require('assert');
 const {
+  FRAME_RENDERER_TYPES,
   INNER_FRAME_STYLES,
   getInnerFrameStyle
 } = require('../miniprogram/core/innerFrameStyles');
@@ -11,19 +12,31 @@ const {
   generateNormalizedEdgeProfile,
   buildFramePaths,
   selectMaskVariant,
-  getMaskAssetPaths
+  getMaskAssetPaths,
+  FRAME_RENDERERS
 } = require('../miniprogram/core/innerFrameRenderer');
 const { renderComposite } = require('../miniprogram/core/compositeRenderer');
 
 function testDeterminism() {
-  const first = generateNormalizedEdgeProfile({ styleId: 'rough-emulsion', seed: 'image-1', strength: 1 });
-  const second = generateNormalizedEdgeProfile({ styleId: 'rough-emulsion', seed: 'image-1', strength: 1 });
-  const other = generateNormalizedEdgeProfile({ styleId: 'rough-emulsion', seed: 'image-2', strength: 1 });
+  const first = generateNormalizedEdgeProfile({ styleId: 'emulsion-damage', seed: 'image-1', strength: 1 });
+  const second = generateNormalizedEdgeProfile({ styleId: 'emulsion-damage', seed: 'image-1', strength: 1 });
+  const other = generateNormalizedEdgeProfile({ styleId: 'emulsion-damage', seed: 'image-2', strength: 1 });
   assert.deepStrictEqual(first, second, 'same seed must produce the same profile');
   assert.notDeepStrictEqual(first, other, 'different seeds should produce different profiles');
-  assert.strictEqual(selectMaskVariant('darkroom-scan', 'image-1'), selectMaskVariant('darkroom-scan', 'image-1'));
-  assert.notStrictEqual(selectMaskVariant('darkroom-scan', 'image-1'), selectMaskVariant('darkroom-scan', 'image-2'));
-  assert(Object.keys(getMaskAssetPaths('rough-emulsion', 2)).length === 8);
+  assert.strictEqual(selectMaskVariant('full-frame-scan', 'image-1'), selectMaskVariant('full-frame-scan', 'image-1'));
+  assert(Object.keys(getMaskAssetPaths('emulsion-damage', 2)).length === 8);
+}
+
+function testStyleRegistry() {
+  const expected = ['none', 'clean-black', 'full-frame-scan', 'film-gate', 'negative-35mm', 'medium-format-120', 'emulsion-damage'];
+  assert.deepStrictEqual(INNER_FRAME_STYLES.map(style => style.id), expected);
+  INNER_FRAME_STYLES.forEach(style => {
+    assert(FRAME_RENDERERS[style.renderer], `${style.id} must have a renderer`);
+    assert(style.supportedRatios.length > 0);
+    if (style.id === 'film-gate') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.FILM_GATE);
+    if (style.id === 'negative-35mm') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.PERFORATED_FILM);
+    if (style.id === 'medium-format-120') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.MEDIUM_FORMAT_REBATE);
+  });
 }
 
 function testPathBoundsAndThickness() {
@@ -120,7 +133,7 @@ function testRenderEntryPoint() {
     outerBackgroundSettings: { enabled: true, color: '#FFFFFF' },
     innerFrameSettings: {
       enabled: true,
-      styleId: 'darkroom-scan',
+      styleId: 'full-frame-scan',
       widthAt1800: 12,
       strengthLevel: 'medium',
       maskImages: {
@@ -130,7 +143,7 @@ function testRenderEntryPoint() {
     }
   });
   assert.strictEqual(result.frameWidth, 12);
-  assert.strictEqual(result.styleId, 'darkroom-scan');
+  assert.strictEqual(result.styleId, 'full-frame-scan');
   assert(result.paths);
   assert(calls.some(call => call[0] === 'clip'));
   assert(calls.some(call => call[0] === 'drawImage'));
@@ -147,8 +160,32 @@ function testRenderEntryPoint() {
   assert.strictEqual(none.frameWidth, 0);
 }
 
+function testDedicatedRenderers() {
+  const ctx = new Proxy({}, { get: () => (...args) => args });
+  const image = { width: 1200, height: 800 };
+  const maskImages = {
+    'top-left': {}, top: {}, 'top-right': {}, right: {},
+    'bottom-right': {}, bottom: {}, 'bottom-left': {}, left: {}
+  };
+  ['film-gate', 'negative-35mm', 'medium-format-120', 'emulsion-damage'].forEach(styleId => {
+    const result = renderComposite({
+      ctx, outWidth: 1800, outHeight: 1200, image, imageId: styleId,
+      imageSeed: 'stable-seed',
+      outerBackgroundSettings: { enabled: true, color: '#FFFFFF' },
+      innerFrameSettings: {
+        enabled: true, styleId, widthAt1800: getInnerFrameStyle(styleId).widthAt1800,
+        strengthLevel: 'medium', maskImages
+      }
+    });
+    assert.strictEqual(result.styleId, styleId);
+    assert(result.paths, `${styleId} should return renderer geometry`);
+  });
+}
+
+testStyleRegistry();
 testDeterminism();
 testPathBoundsAndThickness();
 testGeometryAndScaling();
 testRenderEntryPoint();
+testDedicatedRenderers();
 console.log('film inner frame tests passed');

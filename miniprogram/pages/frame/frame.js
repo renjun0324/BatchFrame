@@ -53,10 +53,14 @@ Page({
     toolOptions: ['template', 'canvas', 'frame', 'image'],
     panelExpanded: true,
     panelScrollTop: 0,
+    currentStyleSupportsStrength: false,
+    currentStyleSupportsColor: true,
     templates: [
       { id: 'white-clean', name: '白底经典', outerBgColor: '#FFFFFF', styleId: 'clean-black', enableOuterBg: true },
-      { id: 'white-scan', name: '白底暗房', outerBgColor: '#FFFFFF', styleId: 'darkroom-scan', enableOuterBg: true },
-      { id: 'white-rough', name: '白底粗粝', outerBgColor: '#FFFFFF', styleId: 'rough-emulsion', enableOuterBg: true },
+      { id: 'white-scan', name: '白底扫描', outerBgColor: '#FFFFFF', styleId: 'full-frame-scan', enableOuterBg: true },
+      { id: 'white-gate', name: '白底片门', outerBgColor: '#FFFFFF', styleId: 'film-gate', enableOuterBg: true },
+      { id: 'white-negative', name: '白底负片', outerBgColor: '#FFFFFF', styleId: 'negative-35mm', enableOuterBg: true },
+      { id: 'white-emulsion', name: '白底乳剂', outerBgColor: '#FFFFFF', styleId: 'emulsion-damage', enableOuterBg: true },
       { id: 'black-clean', name: '黑底经典', outerBgColor: '#000000', styleId: 'clean-black', enableOuterBg: true },
       { id: 'white-none', name: '白底无框', outerBgColor: '#FFFFFF', styleId: 'none', enableOuterBg: true }
     ],
@@ -110,7 +114,14 @@ Page({
     this._imageCacheOrder = [];
     this._frameMaskCache = Object.create(null);
     this._renderToken = 0;
-    this._frameWidths = { 'clean-black': 8, 'darkroom-scan': 12, 'rough-emulsion': 16 };
+    this._frameWidths = {
+      'clean-black': 8,
+      'full-frame-scan': 12,
+      'film-gate': 24,
+      'negative-35mm': 52,
+      'medium-format-120': 64,
+      'emulsion-damage': 18
+    };
     this.canvasReady = false;
     this.imageReady = false;
     this.pendingRender = false;
@@ -398,7 +409,9 @@ Page({
       enableOuterBg: template.enableOuterBg,
       innerFrameStyleId: template.styleId,
       enableInnerBorder: template.styleId !== 'none',
-      borderPx: width
+      borderPx: width,
+      currentStyleSupportsStrength: !!style.supportsStrength,
+      currentStyleSupportsColor: !!style.supportsColor
     }, this.redrawPreview);
   },
 
@@ -606,7 +619,9 @@ Page({
     this.setData({
       innerFrameStyleId: style.id,
       borderPx: width,
-      enableInnerBorder: style.id !== 'none'
+      enableInnerBorder: style.id !== 'none',
+      currentStyleSupportsStrength: !!style.supportsStrength,
+      currentStyleSupportsColor: !!style.supportsColor
     }, this.redrawPreview);
   },
 
@@ -990,7 +1005,8 @@ Page({
             widthAt1800: borderPx,
             color: innerBorderColor,
             strengthLevel: edgeStrengthLevel,
-            maskImages
+            maskImages,
+            backgroundColor: enableOuterBg ? outerBgColor : 'transparent'
           }
         });
         resolve();

@@ -97,9 +97,7 @@
                   class="frame-style-card {{innerFrameStyleId===item.id?'active':''}}"
                   data-style-id="{{item.id}}" bindtap="onInnerFrameStyleTap">
             <view class="frame-card-sample {{item.id}}">
-              <view class="frame-card-photo"></view>
-              <image wx:if="{{item.previewAsset}}" class="frame-card-mask" src="{{item.previewAsset}}" mode="scaleToFill"></image>
-              <view class="frame-card-corner"></view>
+              <image class="frame-card-preview" src="{{item.previewAsset}}" mode="aspectFill"></image>
             </view>
             <text>{{item.name}}</text>
           </view>
@@ -112,7 +110,7 @@
             <button class="btn ghost mini-btn" bindtap="incBorder">＋</button>
           </view>
         </view>
-        <view wx:if="{{innerFrameStyleId==='darkroom-scan' || innerFrameStyleId==='rough-emulsion'}}">
+        <view wx:if="{{currentStyleSupportsStrength}}">
           <text class="field-label">边缘强度</text>
           <view class="strength-row">
             <view wx:for="{{edgeStrengthOptions}}" wx:key="id"
@@ -120,7 +118,7 @@
                   data-level="{{item.id}}" bindtap="onEdgeStrengthTap">{{item.name}}</view>
           </view>
         </view>
-        <view class="setting-row" wx:if="{{innerFrameStyleId==='clean-black'}}">
+        <view class="setting-row" wx:if="{{currentStyleSupportsColor}}">
           <text>内框颜色</text>
           <view class="color-options compact-colors">
             <view wx:for="{{colorPresets}}" wx:key="*this" wx:for-item="color"
