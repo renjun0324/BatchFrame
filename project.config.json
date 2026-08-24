@@ -5,11 +5,15 @@
     "ignore": [
       {
         "type": "folder",
-        "value": "docs/design-v3"
+        "value": "docs"
       },
       {
         "type": "folder",
-        "value": "tools/design-v3"
+        "value": "tools"
+      },
+      {
+        "type": "folder",
+        "value": "tests"
       }
     ],
     "include": []
@@ -30,6 +34,7 @@
     "compileWorklet": false,
     "uglifyFileName": true,
     "uploadWithSourceMap": true,
+    "ignoreUploadUnusedFiles": true,
     "packNpmManually": false,
     "minifyWXSS": true,
     "minifyWXML": true,
