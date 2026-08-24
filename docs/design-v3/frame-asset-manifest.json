@@ -1,0 +1,22 @@
+{
+  "designOnly": true,
+  "generatedBy": "tools/design-v3/generate-design-v3.py",
+  "sourcePhoto": "png/1.jpg (read-only crop)",
+  "assetPolicy": {
+    "remoteAssets": false,
+    "trademarks": false,
+    "runtimeIntegrated": false,
+    "seeded": true
+  },
+  "styles": [
+    {"styleId":"none","name":"无内框","renderer":"clean","variants":1,"requiresCornerAsset":false,"requiresEdgeAsset":false,"requiresPerforations":false,"requiresFrameNumbers":false,"colorEditable":false,"strengthControl":false,"supportedRatios":["1:1","4:5","3:4","2:3","9:16","16:9"],"preview":"frame-styles/style-none.png"},
+    {"styleId":"clean-black","name":"经典细黑边","renderer":"clean","variants":1,"requiresCornerAsset":false,"requiresEdgeAsset":false,"requiresPerforations":false,"requiresFrameNumbers":false,"colorEditable":true,"strengthControl":false,"supportedRatios":["1:1","4:5","3:4","2:3","9:16","16:9"],"preview":"frame-styles/style-clean-black.png"},
+    {"styleId":"full-frame-scan","name":"全幅扫描边","renderer":"segmented-mask","variants":3,"requiresCornerAsset":true,"requiresEdgeAsset":true,"requiresPerforations":false,"requiresFrameNumbers":false,"colorEditable":false,"strengthControl":true,"supportedRatios":["1:1","4:5","3:4","2:3","9:16","16:9"],"preview":"frame-styles/style-full-frame-scan.png"},
+    {"styleId":"film-gate","name":"片门压框","renderer":"film-gate","variants":3,"requiresCornerAsset":true,"requiresEdgeAsset":true,"requiresPerforations":false,"requiresFrameNumbers":false,"colorEditable":false,"strengthControl":false,"supportedRatios":["3:4","4:5","2:3"],"preview":"frame-styles/style-film-gate.png"},
+    {"styleId":"negative-35mm","name":"35mm 负片","renderer":"perforated-film","variants":2,"requiresCornerAsset":true,"requiresEdgeAsset":true,"requiresPerforations":true,"requiresFrameNumbers":true,"colorEditable":false,"strengthControl":false,"supportedRatios":["2:3","3:4","16:9"],"preview":"frame-styles/style-negative-35mm.png"},
+    {"styleId":"medium-format-120","name":"120 中画幅","renderer":"medium-format-rebate","variants":3,"requiresCornerAsset":true,"requiresEdgeAsset":true,"requiresPerforations":false,"requiresFrameNumbers":true,"colorEditable":false,"strengthControl":false,"supportedRatios":["1:1","4:5","3:4"],"preview":"frame-styles/style-medium-format-120.png"},
+    {"styleId":"cine-16mm","name":"16mm 电影胶片","renderer":"perforated-film","variants":2,"requiresCornerAsset":true,"requiresEdgeAsset":true,"requiresPerforations":true,"requiresFrameNumbers":true,"colorEditable":false,"strengthControl":false,"supportedRatios":["16:9","2:3","9:16"],"preview":"frame-styles/style-cine-16mm.png"},
+    {"styleId":"contact-sheet","name":"接触印样边","renderer":"contact-sheet","variants":2,"requiresCornerAsset":true,"requiresEdgeAsset":true,"requiresPerforations":false,"requiresFrameNumbers":true,"colorEditable":false,"strengthControl":false,"supportedRatios":["3:4","4:5","1:1"],"preview":"frame-styles/style-contact-sheet.png"},
+    {"styleId":"emulsion-damage","name":"乳剂破损边","renderer":"emulsion-mask","variants":3,"requiresCornerAsset":true,"requiresEdgeAsset":true,"requiresPerforations":false,"requiresFrameNumbers":false,"colorEditable":false,"strengthControl":true,"supportedRatios":["1:1","4:5","3:4","2:3","9:16","16:9"],"preview":"frame-styles/style-emulsion-damage.png"}
+  ]
+}
