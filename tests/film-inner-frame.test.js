@@ -2,18 +2,18 @@ const assert = require('assert');
 const {
   INNER_FRAME_STYLES,
   getInnerFrameStyle
-} = require('../core/innerFrameStyles');
+} = require('../miniprogram/core/innerFrameStyles');
 const {
   calculateImageRect,
   scaleFrameWidth
-} = require('../core/frameGeometry');
+} = require('../miniprogram/core/frameGeometry');
 const {
   generateNormalizedEdgeProfile,
   buildFramePaths,
   selectMaskVariant,
   getMaskAssetPaths
-} = require('../core/innerFrameRenderer');
-const { renderComposite } = require('../core/compositeRenderer');
+} = require('../miniprogram/core/innerFrameRenderer');
+const { renderComposite } = require('../miniprogram/core/compositeRenderer');
 
 function testDeterminism() {
   const first = generateNormalizedEdgeProfile({ styleId: 'rough-emulsion', seed: 'image-1', strength: 1 });

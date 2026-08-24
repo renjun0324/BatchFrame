@@ -15,7 +15,7 @@ import random
 from PIL import Image, ImageDraw, ImageFilter
 
 
-ROOT = Path(__file__).resolve().parents[1] / "assets" / "frame-masks"
+ROOT = Path(__file__).resolve().parents[1] / "miniprogram" / "assets" / "frame-masks"
 SEGMENTS = ("top-left", "top", "top-right", "right", "bottom-right", "bottom", "bottom-left", "left")
 
 

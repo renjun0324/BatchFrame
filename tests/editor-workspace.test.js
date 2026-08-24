@@ -1,9 +1,9 @@
 const assert = require('assert');
 const fs = require('fs');
 
-const wxml = fs.readFileSync('pages/frame/frame.wxml', 'utf8');
-const wxss = fs.readFileSync('pages/frame/frame.wxss', 'utf8');
-const js = fs.readFileSync('pages/frame/frame.js', 'utf8');
+const wxml = fs.readFileSync('miniprogram/pages/frame/frame.wxml', 'utf8');
+const wxss = fs.readFileSync('miniprogram/pages/frame/frame.wxss', 'utf8');
+const js = fs.readFileSync('miniprogram/pages/frame/frame.js', 'utf8');
 
 assert(wxml.includes('activeTool'), 'tool state must be rendered');
 assert(wxml.includes("activeTool==='template'"));

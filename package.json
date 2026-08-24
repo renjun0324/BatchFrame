@@ -2,6 +2,8 @@
   "name": "batchframe",
   "private": true,
   "scripts": {
-    "test": "python3 tools/verify-frame-mask-assets.py && node tests/film-inner-frame.test.js && node tests/editor-workspace.test.js && node tests/check-image-security.test.js && node tests/content-security.test.js && node tests/security-preflight.test.js"
+    "test": "python3 tools/verify-frame-mask-assets.py && node tests/film-inner-frame.test.js && node tests/editor-workspace.test.js && node tests/check-image-security.test.js && node tests/content-security.test.js && node tests/security-preflight.test.js",
+    "audit:package": "python3 tools/audit-miniprogram-size.py",
+    "verify": "npm test && npm run audit:package"
   }
 }

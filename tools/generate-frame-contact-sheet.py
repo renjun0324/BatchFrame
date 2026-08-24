@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PHOTO = ROOT / "png" / "1.jpg"
+PHOTO = ROOT / "docs" / "readme-assets" / "example.jpg"
 OUT = ROOT / "docs" / "frame-style-review" / "contact-sheet.png"
 SEGMENTS = ("top-left", "top", "top-right", "right", "bottom-right", "bottom", "bottom-left", "left")
 FONT = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
@@ -21,7 +21,7 @@ def font(size):
 
 def mask_path(style, segment):
     variant = "variant-01"
-    return ROOT / "assets" / "frame-masks" / style / variant / f"{segment}.png"
+    return ROOT / "miniprogram" / "assets" / "frame-masks" / style / variant / f"{segment}.png"
 
 
 def compose(style):

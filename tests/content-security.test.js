@@ -33,7 +33,7 @@ function makeWx(callFunction) {
 }
 
 function loadSecurity() {
-  const modulePath = require.resolve('../utils/contentSecurity.js')
+  const modulePath = require.resolve('../miniprogram/utils/contentSecurity.js')
   delete require.cache[modulePath]
   return require(modulePath)
 }

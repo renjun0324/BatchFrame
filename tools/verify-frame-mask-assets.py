@@ -5,7 +5,7 @@ from pathlib import Path
 from PIL import Image
 
 
-ROOT = Path(__file__).resolve().parents[1] / "assets" / "frame-masks"
+ROOT = Path(__file__).resolve().parents[1] / "miniprogram" / "assets" / "frame-masks"
 EXPECTED = {"darkroom-scan": 2, "rough-emulsion": 3}
 SEGMENTS = {"top-left", "top", "top-right", "right", "bottom-right", "bottom", "bottom-left", "left"}
 

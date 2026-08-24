@@ -3,7 +3,7 @@ const {
   mergeSecurityResults,
   normalizeHostname,
   summarizeSecurity
-} = require('../utils/securityPreflight')
+} = require('../miniprogram/utils/securityPreflight')
 
 function run() {
   assert.strictEqual(normalizeHostname('Bucket.TCB.QCLOUD.LA.'), 'bucket.tcb.qcloud.la')
