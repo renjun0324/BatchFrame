@@ -643,6 +643,8 @@ Page({
       const style = getInnerFrameStyle('clean-black');
       patch.innerFrameStyleId = style.id;
       patch.borderPx = style.widthAt1800;
+      patch.currentStyleSupportsStrength = !!style.supportsStrength;
+      patch.currentStyleSupportsColor = !!style.supportsColor;
     }
     this.setData(patch, this.redrawPreview);
   },
