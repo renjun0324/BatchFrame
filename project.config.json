@@ -1,21 +1,10 @@
 {
   "compileType": "miniprogram",
+  "miniprogramRoot": "miniprogram/",
+  "cloudfunctionRoot": "cloudfunctions/",
   "libVersion": "3.11.1",
   "packOptions": {
-    "ignore": [
-      {
-        "type": "folder",
-        "value": "docs"
-      },
-      {
-        "type": "folder",
-        "value": "tools"
-      },
-      {
-        "type": "folder",
-        "value": "tests"
-      }
-    ],
+    "ignore": [],
     "include": []
   },
   "setting": {
@@ -52,6 +41,5 @@
   },
   "appid": "wxa4649dd2fc0d1471",
   "simulatorPluginLibVersion": {},
-  "cloudfunctionRoot": "cloudfunctions/",
   "cloudfunctionTemplateRoot": "cloudfunctionTemplate/"
 }

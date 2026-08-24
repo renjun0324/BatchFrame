@@ -1,7 +1,7 @@
 {
   "designOnly": true,
   "generatedBy": "tools/design-v3/generate-design-v3.py",
-  "sourcePhoto": "png/1.jpg (read-only crop)",
+  "sourcePhoto": "docs/readme-assets/example.jpg (read-only crop)",
   "assetPolicy": {
     "remoteAssets": false,
     "trademarks": false,
