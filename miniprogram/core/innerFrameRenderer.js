@@ -279,7 +279,13 @@ function drawPerforations(ctx, frameRect, frameWidth, backgroundColor, seed) {
 function drawFrameCode(ctx, frameRect, frameWidth, seed, backgroundColor) {
   if (typeof ctx.fillText !== 'function') return;
   ctx.save();
-  ctx.fillStyle = backgroundColor && backgroundColor !== 'transparent' ? backgroundColor : '#FFFFFF';
+  const transparent = !backgroundColor || backgroundColor === 'transparent';
+  if (transparent) {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = '#000000';
+  } else {
+    ctx.fillStyle = backgroundColor;
+  }
   ctx.font = `${Math.max(8, Math.round(frameWidth * 0.38))}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
