@@ -2,6 +2,7 @@ const contentSecurity = require('../../utils/contentSecurity.js');
 const { INNER_FRAME_STYLES, EDGE_STRENGTHS, getInnerFrameStyle } = require('../../core/innerFrameStyles.js');
 const { renderComposite } = require('../../core/compositeRenderer.js');
 const { selectMaskVariant, getMaskAssetPaths } = require('../../core/innerFrameRenderer.js');
+const { mergeSecurityResults, summarizeSecurity } = require('../../utils/securityPreflight.js');
 const sys = wx.getWindowInfo();
 const DPR = sys.pixelRatio || 1;
 
@@ -23,7 +24,12 @@ function imageRecord(path, index) {
     id,
     frameSeed: id,
     path,
-    securityStatus: 'checking'
+    securityStatus: 'checking',
+    securityErrCode: '',
+    securityTransport: '',
+    securityMessage: '',
+    securityCdnHost: '',
+    securityCheckedAt: 0
   };
 }
 
@@ -198,7 +204,7 @@ Page({
           this.extractMainColors(paths[0]);
           this.updatePreviewSize().then(() => this.redrawPreview());
         });
-        this.backgroundCheckImages(paths, checkId);
+        this._backgroundSecurityPromise = this.backgroundCheckImages(paths, checkId);
       }
     });
   },
@@ -206,7 +212,7 @@ Page({
   // 安全检测在后台运行；只有导出前才会拦截未通过的图片。
   async backgroundCheckImages(paths, checkId) {
     try {
-      await contentSecurity.checkMultipleImages(
+      const response = await contentSecurity.checkMultipleImages(
         paths,
         (current, total) => {
           if (this._securityCheckId !== checkId) return;
@@ -214,25 +220,33 @@ Page({
             checkingProgress: current,
             checkingTotal: total
           });
-        },
-        result => this.applySecurityResult(result, checkId)
+        }
       );
       if (this._securityCheckId !== checkId) return;
-      this.setData({ isChecking: false });
+      const mergedImages = mergeSecurityResults(
+        this.data.images,
+        response && response.results,
+        Date.now()
+      );
+      await this.setDataAsync({
+        images: mergedImages,
+        isChecking: false
+      });
+      return response;
     } catch (err) {
       if (this._securityCheckId !== checkId) return;
       console.error('[content-security] background batch failed', err);
-      this.setData({ isChecking: false });
+      await this.setDataAsync({ isChecking: false });
+      return { results: [] };
     }
   },
 
   applySecurityResult(result, checkId) {
     if (!result || this._securityCheckId !== checkId) return;
+    const mergedImages = mergeSecurityResults(this.data.images, [result], Date.now());
+    this.setData({ images: mergedImages });
     const index = this.data.images.findIndex(item => imagePath(item) === result.path);
     if (index < 0) return;
-    this.setData({
-      [`images[${index}].securityStatus`]: result.status
-    });
     console.info('[content-security] image status', {
       id: this.data.images[index].id,
       path: result.path,
@@ -242,37 +256,77 @@ Page({
     });
   },
 
+  setDataAsync(patch) {
+    return new Promise(resolve => this.setData(patch, resolve));
+  },
+
+  logSecurityBlock(summary) {
+    console.error('[content-security] export blocked', {
+      unresolved: summary.unresolved.map(({ item, index }) => ({
+        id: item.id,
+        index,
+        status: item.securityStatus,
+        errCode: item.securityErrCode || null,
+        transport: item.securityTransport || null,
+        cdnHost: item.securityCdnHost || null,
+        message: item.securityMessage || null
+      }))
+    });
+  },
+
   async ensureSecurityBeforeExport() {
-    const current = this.data.images || [];
-    const rejected = current.filter(item => item.securityStatus === 'rejected');
-    if (rejected.length) {
-      await this.showSecurityBlock(rejected);
+    if (this._backgroundSecurityPromise) {
+      const backgroundPromise = this._backgroundSecurityPromise;
+      try {
+        await backgroundPromise;
+      } catch (err) {
+        console.error('[content-security] background wait failed', err);
+      }
+    }
+
+    let current = this.data.images || [];
+    let summary = summarizeSecurity(current);
+    if (summary.rejected.length) {
+      this.logSecurityBlock(summary);
+      await this.showSecurityBlock(summary.rejected.map(entry => entry.item));
       return false;
     }
 
-    const retryItems = current.filter(item => item.securityStatus !== 'passed');
+    const retryItems = summary.unresolved.map(entry => entry.item);
     if (retryItems.length) {
       const retryPaths = retryItems.map(imagePath);
       const retryId = (this._securityCheckId || 0) + 1;
       this._securityCheckId = retryId;
-      this.setData({ isChecking: true });
-      await contentSecurity.checkMultipleImages(
-        retryPaths,
-        null,
-        result => this.applySecurityResult(result, retryId)
-      );
+      await this.setDataAsync({ isChecking: true });
+      let retryResponse = { results: [] };
+      try {
+        retryResponse = await contentSecurity.checkMultipleImages(retryPaths);
+      } catch (err) {
+        console.error('[content-security] export retry failed', {
+          errCode: err && (err.errCode || err.code) || 'SECURITY_CHECK_ERROR',
+          message: err && (err.errMsg || err.message)
+        });
+      }
       if (this._securityCheckId !== retryId) return false;
-      this.setData({ isChecking: false });
+      current = mergeSecurityResults(
+        this.data.images,
+        retryResponse.results || [],
+        Date.now()
+      );
+      await this.setDataAsync({
+        images: current,
+        isChecking: false
+      });
+      summary = summarizeSecurity(current);
     }
 
-    const latest = this.data.images || [];
-    const rejectedAfterRetry = latest.filter(item => item.securityStatus === 'rejected');
-    if (rejectedAfterRetry.length) {
-      await this.showSecurityBlock(rejectedAfterRetry);
+    if (summary.rejected.length) {
+      this.logSecurityBlock(summary);
+      await this.showSecurityBlock(summary.rejected.map(entry => entry.item));
       return false;
     }
-    const unresolved = latest.filter(item => item.securityStatus !== 'passed');
-    if (unresolved.length) {
+    if (summary.unresolved.length) {
+      this.logSecurityBlock(summary);
       wx.showModal({
         title: '暂时无法导出',
         content: '检测服务暂时不可用，请稍后重试。图片仍可继续编辑。',

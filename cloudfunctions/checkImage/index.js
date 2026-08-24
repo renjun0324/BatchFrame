@@ -1,9 +1,9 @@
 // 云函数：检查图片内容安全。
 // CDN 只接受明确的 HTTPS 云开发域名；客户端在 CDN 传输错误时会使用 fileID 回退。
 const cloud = require('wx-server-sdk')
-const http = require('http')
-const https = require('https')
 const {
+  MAX_IMAGE_BYTES,
+  MAX_REDIRECTS,
   createTransportError,
   getSafeHostname,
   getTrustedCdnSuffixes,
@@ -11,6 +11,7 @@ const {
   validateRedirectCount,
   validateContentLength
 } = require('./securityTransport')
+const { downloadImageUrl } = require('./cdnDownloader')
 
 cloud.init({
   env: cloud.DYNAMIC_CURRENT_ENV
@@ -44,112 +45,6 @@ function errorResponse(error, transport, startedAt) {
     totalMs: Date.now() - startedAt
   })
   return response
-}
-
-function mapDownloadError(error) {
-  if (error && error.code) return error
-  return createTransportError(
-    'CDN_DOWNLOAD_FAILED',
-    getErrorMessage(error, '临时 CDN 图片下载失败')
-  )
-}
-
-function downloadImageUrl(rawUrl, redirectCount = 0) {
-  let parsed
-  try {
-    parsed = validateCdnUrl(rawUrl, getTrustedCdnSuffixes())
-  } catch (error) {
-    return Promise.reject(error)
-  }
-
-  try {
-    validateRedirectCount(redirectCount)
-  } catch (error) {
-    return Promise.reject(error)
-  }
-
-  return new Promise((resolve, reject) => {
-    let settled = false
-    const finish = (error, value) => {
-      if (settled) return
-      settled = true
-      if (error) reject(mapDownloadError(error))
-      else resolve(value)
-    }
-    const transport = parsed.protocol === 'https:' ? https : http
-    const request = transport.get(
-      parsed,
-      { headers: { Accept: 'image/*' } },
-      response => {
-        if (
-          response.statusCode >= 300 &&
-          response.statusCode < 400 &&
-          response.headers.location
-        ) {
-          response.resume()
-          if (redirectCount >= MAX_REDIRECTS) {
-            finish(createTransportError(
-              'CDN_TOO_MANY_REDIRECTS',
-              '图片地址重定向次数过多'
-            ))
-            return
-          }
-          let nextUrl
-          try {
-            nextUrl = new URL(response.headers.location, parsed).toString()
-          } catch (error) {
-            finish(createTransportError('INVALID_CDN_URL', '重定向地址无效'))
-            return
-          }
-          downloadImageUrl(nextUrl, redirectCount + 1)
-            .then(value => finish(null, value))
-            .catch(error => finish(error))
-          return
-        }
-
-        if (response.statusCode !== 200) {
-          response.resume()
-          finish(createTransportError(
-            'CDN_HTTP_ERROR',
-            `临时 CDN 返回 HTTP ${response.statusCode}`,
-            { httpStatus: response.statusCode }
-          ))
-          return
-        }
-
-        try {
-          validateContentLength(response.headers['content-length'])
-        } catch (error) {
-          response.resume()
-          finish(error)
-          return
-        }
-
-        const chunks = []
-        let total = 0
-        response.on('data', chunk => {
-          if (settled) return
-          total += chunk.length
-          if (total > MAX_IMAGE_BYTES) {
-            request.destroy()
-            finish(createTransportError('CDN_TOO_LARGE', '图片超过 10MB 限制'))
-            return
-          }
-          chunks.push(chunk)
-        })
-        response.on('end', () => finish(null, Buffer.concat(chunks)))
-        response.on('error', error => finish(error))
-      }
-    )
-    request.setTimeout(8000, () => {
-      finish(createTransportError('CDN_DOWNLOAD_TIMEOUT', '下载图片超时'))
-      request.destroy()
-    })
-    request.on('error', error => {
-      if (error && error.code === 'ECONNRESET' && settled) return
-      finish(error)
-    })
-  })
 }
 
 function safeRequestLog(event) {
@@ -276,5 +171,6 @@ exports.main = async (event, context) => {
 exports._test = {
   downloadImageUrl,
   errorResponse,
-  safeRequestLog
+  safeRequestLog,
+  limits: { MAX_IMAGE_BYTES, MAX_REDIRECTS }
 }

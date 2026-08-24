@@ -107,6 +107,36 @@ async function run() {
   assert.strictEqual(state.uploads.length, 1)
   assert.strictEqual(state.deleted.length, 1)
 
+  state = makeWx(data => data.imgUrl
+    ? {
+      success: false,
+      safe: false,
+      status: 'error',
+      errCode: -1,
+      errMsg: '图片地址不是受信任的临时 CDN 地址',
+      transport: 'cdn'
+    }
+    : { success: true, safe: true, status: 'passed', transport: 'file-id' })
+  security = loadSecurity()
+  result = await security.checkSingleImage('/tmp/photo.jpg')
+  assert.strictEqual(result.status, 'passed')
+  assert.strictEqual(result.transport, 'upload-fallback')
+  assert.strictEqual(state.uploads.length, 1)
+
+  state = makeWx(data => ({
+    success: false,
+    safe: false,
+    status: 'error',
+    errCode: -1,
+    errMsg: '其他服务错误',
+    transport: data.imgUrl ? 'cdn' : 'file-id'
+  }))
+  security = loadSecurity()
+  result = await security.checkSingleImage('/tmp/photo.jpg')
+  assert.strictEqual(result.status, 'error')
+  assert.strictEqual(result.errCode, -1)
+  assert.strictEqual(state.uploads.length, 0)
+
   console.log('content-security.test.js: all tests passed')
 }
 

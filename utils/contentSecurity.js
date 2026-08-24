@@ -21,6 +21,7 @@ const CDN_TRANSPORT_ERRORS = new Set([
   'CDN_DOWNLOAD_TIMEOUT',
   'CDN_DOWNLOAD_FAILED'
 ]);
+const LEGACY_UNTRUSTED_CDN_MESSAGE = '图片地址不是受信任的临时 CDN 地址';
 
 function getContentTypeFromPath(filePath) {
   const match = String(filePath || '').split('?')[0].match(/\.([a-zA-Z0-9]+)$/);
@@ -59,9 +60,11 @@ function getResultErrorCode(result) {
 
 function isCdnTransportError(result) {
   const code = getResultErrorCode(result);
-  return typeof code === 'string' && (
+  if (typeof code === 'string' && (
     CDN_TRANSPORT_ERRORS.has(code) || code.startsWith('CDN_')
-  );
+  )) return true;
+  return (code === -1 || code === '-1') &&
+    (result && (result.errMsg || result.message)) === LEGACY_UNTRUSTED_CDN_MESSAGE;
 }
 
 function createResultError(result) {
