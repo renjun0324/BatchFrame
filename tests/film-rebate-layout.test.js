@@ -106,7 +106,7 @@ function testRendererReturnsLayout() {
       frameIndex: 2
     }
   });
-  assert(result.frameRect && result.apertureRect && result.decorationRects);
+  assert(result.innerAvailableRect && result.frameRect && result.apertureRect && result.decorationRects);
   assert.strictEqual(result.decorationRects.perforations.length, 16);
   assert(calls.some(call => call.key === 'drawImage'));
   assert(calls.some(call => call.key === 'fillText'));

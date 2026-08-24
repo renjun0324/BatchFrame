@@ -64,6 +64,7 @@ function renderComposite({
       imageRect: layout.apertureRect,
       frameWidth: 0,
       styleId: style.id,
+      innerAvailableRect: layout.innerAvailableRect,
       frameRect: layout.frameRect,
       apertureRect: layout.apertureRect,
       decorationRects: layout.decorationRects,
