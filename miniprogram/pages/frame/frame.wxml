@@ -1,10 +1,10 @@
 <view class="workspace">
   <view class="top-bar">
     <view class="top-title">
-      <text class="app-name">批量装裱</text>
-      <text class="selection-count" wx:if="{{images.length}}">{{images.length}} 张照片</text>
+      <text class="app-name">{{images.length?'照片序列':'装裱编辑器'}}</text>
+      <text class="selection-count" wx:if="{{images.length}}">{{images.length}} 张</text>
     </view>
-    <button class="btn primary compact-btn" bindtap="chooseImages">选择照片</button>
+    <button class="btn primary compact-btn" bindtap="chooseImages">{{images.length?'添加照片':'选择照片'}}</button>
   </view>
 
   <view class="preview-stage">
@@ -12,7 +12,7 @@
       <canvas type="2d" id="preview"
               style="width: {{displayWidth}}px; height: {{displayHeight}}px; background: {{canvasBg}};"
               width="{{previewW}}" height="{{previewH}}"></canvas>
-      <view class="preview-badge">{{zoomPct}}%</view>
+      <view class="preview-badge" wx:if="{{showZoomBadge}}">{{imageZoomPct}}%</view>
       <view class="empty-preview" wx:if="{{!images.length}}">
         <text class="empty-title">批量统一照片版式</text>
         <text class="empty-copy">选择照片后，用外层留白和内层边框做一组统一装裱。</text>
@@ -36,11 +36,12 @@
           class="tool-tab {{activeTool===item?'active':''}}"
           data-tool="{{item}}" bindtap="onToolTap">
       <text wx:if="{{item==='template'}}">模板</text>
-      <text wx:if="{{item==='canvas'}}">画布</text>
+      <text wx:if="{{item==='canvas'}}">画面</text>
       <text wx:if="{{item==='frame'}}">内框</text>
-      <text wx:if="{{item==='image'}}">图片</text>
     </view>
-    <view class="panel-toggle" bindtap="togglePanel">{{panelExpanded?'收起':'展开'}}</view>
+    <view class="panel-toggle" bindtap="togglePanel">
+      <view class="panel-toggle-icon {{panelExpanded?'up':''}}"></view>
+    </view>
   </view>
 
   <view class="setting-sheet {{panelExpanded?'expanded':'collapsed'}}">
@@ -62,7 +63,7 @@
       </view>
 
       <view wx:if="{{activeTool==='canvas'}}" class="tool-panel">
-        <view class="panel-heading">画布</view>
+        <view class="panel-heading">画面</view>
         <text class="field-label">输出比例</text>
         <scroll-view class="chip-row" scroll-x>
           <view wx:for="{{ratioOptions}}" wx:key="*this"
@@ -80,13 +81,26 @@
         </view>
         <view class="setting-row">
           <text>外层背景</text>
-          <switch checked="{{enableOuterBg}}" bindchange="toggleOuterBg" color="#6f8cff"/>
+          <switch checked="{{enableOuterBg}}" bindchange="toggleOuterBg" color="#9E4F2B"/>
         </view>
         <view class="color-options compact-colors" wx:if="{{enableOuterBg}}">
           <view wx:for="{{colorPresets}}" wx:key="*this" wx:for-item="color"
                 class="color-item {{outerBgColor===color?'active':''}}"
                 style="background:{{color}}" data-color="{{color}}" bindtap="selectOuterColor"></view>
           <view class="color-item custom-color" bindtap="openColorPicker" data-type="outer">+</view>
+        </view>
+        <view class="picture-adjustment" wx:if="{{images.length}}">
+          <view class="adjustment-heading">
+            <text>图片缩放</text>
+            <text class="setting-value">{{imageZoomPct}}%</text>
+          </view>
+          <slider min="100" max="200" step="1" value="{{imageZoomPct}}"
+                  bindchanging="onImageZoomChanging" bindchange="onImageZoomChange"
+                  activeColor="#9E4F2B" backgroundColor="#D8D0C3" block-color="#9E4F2B"/>
+          <view class="adjustment-footer">
+            <text class="panel-hint">放大照片以调整片基窗口内的构图</text>
+            <button class="text-action" bindtap="resetCurrentImageZoom">恢复</button>
+          </view>
         </view>
       </view>
 
@@ -146,32 +160,15 @@
                   class="choice-chip {{frameSizePreset===item.id?'active':''}}"
                   data-preset="{{item.id}}" bindtap="onFrameSizePresetTap">{{item.name}}</view>
           </view>
-          <view class="setting-row" wx:if="{{currentStyleSupportsPerforations}}"><text>齿孔</text><switch checked="{{framePerforationsEnabled}}" bindchange="toggleFramePerforations" color="#6f8cff"/></view>
-          <view class="setting-row" wx:if="{{currentStyleSupportsEdgeLabel}}"><text>边码</text><switch checked="{{frameEdgeLabelEnabled}}" bindchange="toggleFrameEdgeLabel" color="#6f8cff"/></view>
-          <view class="setting-row" wx:if="{{currentStyleSupportsFrameNumber}}"><text>帧号</text><switch checked="{{frameNumberEnabled}}" bindchange="toggleFrameNumber" color="#6f8cff"/></view>
-          <view class="setting-row" wx:if="{{currentStyleSupportsMarkers}}"><text>角标</text><switch checked="{{frameMarkersEnabled}}" bindchange="toggleFrameMarkers" color="#6f8cff"/></view>
+          <view class="setting-row" wx:if="{{currentStyleSupportsPerforations}}"><text>齿孔</text><switch checked="{{framePerforationsEnabled}}" bindchange="toggleFramePerforations" color="#9E4F2B"/></view>
+          <view class="setting-row" wx:if="{{currentStyleSupportsEdgeLabel}}"><text>边码</text><switch checked="{{frameEdgeLabelEnabled}}" bindchange="toggleFrameEdgeLabel" color="#9E4F2B"/></view>
+          <view class="setting-row" wx:if="{{currentStyleSupportsFrameNumber}}"><text>帧号</text><switch checked="{{frameNumberEnabled}}" bindchange="toggleFrameNumber" color="#9E4F2B"/></view>
+          <view class="setting-row" wx:if="{{currentStyleSupportsMarkers}}"><text>角标</text><switch checked="{{frameMarkersEnabled}}" bindchange="toggleFrameMarkers" color="#9E4F2B"/></view>
         </view>
         <view class="setting-row">
           <text>启用内框</text>
-          <switch checked="{{enableInnerBorder}}" bindchange="toggleInnerBorder" color="#6f8cff"/>
+          <switch checked="{{enableInnerBorder}}" bindchange="toggleInnerBorder" color="#9E4F2B"/>
         </view>
-      </view>
-
-      <view wx:if="{{activeTool==='image'}}" class="tool-panel">
-        <view class="panel-heading">图片</view>
-        <view class="setting-row">
-          <text>适配方式</text>
-          <text class="muted">完整显示</text>
-        </view>
-        <view class="setting-row">
-          <text>图片缩放</text>
-          <view class="inline-actions">
-            <button class="btn ghost mini-btn" bindtap="decZoom">－</button>
-            <input class="small-input" type="digit" value="{{zoomPct}}" bindinput="onZoomInput" bindblur="onZoomBlur"/>
-            <button class="btn ghost mini-btn" bindtap="incZoom">＋</button>
-          </view>
-        </view>
-        <view class="panel-hint">当前版本保留完整显示和缩放；位置调整暂不显示未实现控件。</view>
       </view>
     </scroll-view>
   </view>
@@ -189,9 +186,9 @@
       <view class="color-picker-header"><text class="color-picker-title">自定义颜色</text><view bindtap="closeColorPicker">×</view></view>
       <view class="color-picker-body">
         <view class="color-preview-section"><view class="color-preview-box" style="background:{{currentPickerColor}}"></view><text>{{currentPickerColor}}</text></view>
-        <slider min="0" max="360" value="{{hue}}" bindchange="onHueChange" activeColor="#6f8cff"/>
-        <slider min="0" max="100" value="{{saturation}}" bindchange="onSaturationChange" activeColor="#6f8cff"/>
-        <slider min="0" max="100" value="{{lightness}}" bindchange="onLightnessChange" activeColor="#6f8cff"/>
+        <slider min="0" max="360" value="{{hue}}" bindchange="onHueChange" activeColor="#9E4F2B"/>
+        <slider min="0" max="100" value="{{saturation}}" bindchange="onSaturationChange" activeColor="#9E4F2B"/>
+        <slider min="0" max="100" value="{{lightness}}" bindchange="onLightnessChange" activeColor="#9E4F2B"/>
       </view>
       <view class="color-picker-footer"><button class="btn ghost" bindtap="closeColorPicker">取消</button><button class="btn primary" bindtap="confirmColorPicker">确定</button></view>
     </view>

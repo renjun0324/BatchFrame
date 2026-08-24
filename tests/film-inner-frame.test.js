@@ -125,6 +125,9 @@ function testGeometryAndScaling() {
   [1200, 1800, 2400, 4000].forEach(longEdge => {
     assert.strictEqual(scaleFrameWidth(12, longEdge), 12 * longEdge / 1800);
   });
+  const base = calculateImageRect({ outWidth: 1800, outHeight: 1200, imageWidth: 4000, imageHeight: 3000, zoom: 0.95 });
+  const enlarged = calculateImageRect({ outWidth: 1800, outHeight: 1200, imageWidth: 4000, imageHeight: 3000, zoom: 1.9 });
+  assert(enlarged.width > base.width * 1.9, 'manual image scale must remain effective up to 200%');
 }
 
 function testRenderEntryPoint() {

@@ -54,6 +54,7 @@ function renderComposite({
       layout,
       color: style.color,
       backgroundColor: outerBackgroundSettings.enabled ? outerBackgroundSettings.color : 'transparent',
+      imageZoom: innerFrameSettings.imageZoom || 1,
       framePerforationsEnabled: innerFrameSettings.perforationsEnabled !== false,
       frameEdgeLabelEnabled: innerFrameSettings.edgeLabelEnabled !== false,
       frameNumberEnabled: innerFrameSettings.frameNumberEnabled !== false,
@@ -68,6 +69,7 @@ function renderComposite({
       frameRect: layout.frameRect,
       apertureRect: layout.apertureRect,
       decorationRects: layout.decorationRects,
+      imageDrawRect: filmPaths && filmPaths.imageDrawRect,
       paths: filmPaths
     };
   }
@@ -77,7 +79,7 @@ function renderComposite({
     outHeight: height,
     imageWidth: image.width,
     imageHeight: image.height,
-    zoom: layoutSettings.zoom,
+    zoom: (Number(layoutSettings.zoom) || 1) * (Number(innerFrameSettings.imageZoom) || 1),
     fit: layoutSettings.fit || 'contain',
     layoutPadding: layoutSettings.layoutPadding
   });

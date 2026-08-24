@@ -26,6 +26,7 @@ function imageRecord(path, index) {
     id,
     frameSeed: id,
     path,
+    imageZoom: 1,
     securityStatus: 'checking',
     securityErrCode: '',
     securityTransport: '',
@@ -73,7 +74,7 @@ Page({
     edgeStrengthLevel: 'medium',
     edgeStrengthOptions: EDGE_STRENGTHS,
     activeTool: 'template',
-    toolOptions: ['template', 'canvas', 'frame', 'image'],
+    toolOptions: ['template', 'canvas', 'frame'],
     panelExpanded: true,
     panelScrollTop: 0,
     currentStyleSupportsStrength: false,
@@ -102,8 +103,12 @@ Page({
       { id: 'black-clean', name: '黑底经典', outerBgColor: '#000000', styleId: 'clean-black', enableOuterBg: true },
       { id: 'white-none', name: '白底无框', outerBgColor: '#FFFFFF', styleId: 'none', enableOuterBg: true }
     ],
+    // zoom controls the complete mounted module. It stays internal so the
+    // canvas layout remains stable; imageZoom is the user-facing crop scale.
     zoom: 0.95,
-    zoomPct: 95,
+    imageZoom: 1,
+    imageZoomPct: 100,
+    showZoomBadge: false,
 
     // 外部白底和内部边框控制
     enableOuterBg: true,        // 是否显示外部背景
@@ -117,7 +122,7 @@ Page({
     checkingTotal: 0,           // 总数
     
     // 颜色预设：黑色、灰色、白色 + 三个常用颜色
-    colorPresets: ['#000000', '#666666', '#FFFFFF', '#FF6B6B', '#4ECDC4', '#45B7D1'],
+    colorPresets: ['#FFFFFF', '#F1EAE0', '#DDD1BE', '#1C1B18', '#5A6259', '#A95B3A'],
 
     canvasBg: '#FFFFFF',
     
@@ -181,7 +186,7 @@ Page({
     if (this._canvasRetryTimer) clearTimeout(this._canvasRetryTimer);
     if (this._redrawTimer) clearTimeout(this._redrawTimer);
     if (this.borderTimer) clearTimeout(this.borderTimer);
-    if (this.zoomTimer) clearTimeout(this.zoomTimer);
+    if (this._imageZoomBadgeTimer) clearTimeout(this._imageZoomBadgeTimer);
     if (wx.offWindowResize && this._windowResizeHandler) wx.offWindowResize(this._windowResizeHandler);
     this._renderToken = (this._renderToken || 0) + 1;
     this._imageCache = Object.create(null);
@@ -245,6 +250,8 @@ Page({
         this.setData({
           images,
           curIndex: 0,
+          imageZoom: 1,
+          imageZoomPct: 100,
           isChecking: true,
           checkingProgress: 0,
           checkingTotal: paths.length
@@ -400,8 +407,14 @@ Page({
     });
   },
   onPickIndex(e){ 
-    const idx = +e.currentTarget.dataset.idx || 0; 
-    this.setData({curIndex:idx}, ()=>{
+    const idx = +e.currentTarget.dataset.idx || 0;
+    const selected = this.data.images[idx] || {};
+    this.setData({
+      curIndex: idx,
+      imageZoom: Number(selected.imageZoom) || 1,
+      imageZoomPct: Math.round((Number(selected.imageZoom) || 1) * 100),
+      showZoomBadge: false
+    }, ()=>{
       // 分析当前选中图片的主色调
       if(this.data.images.length > idx){
         this.extractMainColors(imagePath(this.data.images[idx]));
@@ -584,52 +597,6 @@ Page({
       this.applyBorder(num);
     }
   },
-  onZoomInput(e){
-    const val = e.detail.value;
-    // 允许空字符串，允许用户删除所有内容
-    if(val === ''){
-      // 保存一个临时标记，表示正在输入中
-      if(!this._zoomInputting) {
-        this._zoomLastValue = this.data.zoomPct || 95;
-      }
-      this._zoomInputting = true;
-      this.setData({ zoomPct: '' });
-      clearTimeout(this.zoomTimer);
-      return;
-    }
-    // 只允许数字
-    const num = parseInt(val, 10);
-    if(!isNaN(num)){
-      this._zoomInputting = true;
-      // 先更新显示值，让用户可以继续输入，不触发预览更新
-      this.setData({ zoomPct: num }, ()=>{
-        // 延迟更新预览，避免频繁重绘
-        clearTimeout(this.zoomTimer);
-        this.zoomTimer = setTimeout(() => {
-          this._zoomInputting = false;
-          this.applyZoom(num);
-        }, 600);
-      });
-    } else {
-      // 非数字输入，恢复到上一个有效值
-      const lastVal = this._zoomLastValue || this.data.zoomPct || 95;
-      this.setData({ zoomPct: lastVal });
-    }
-  },
-  onZoomBlur(e){
-    const val = e.detail.value;
-    clearTimeout(this.zoomTimer);
-    this._zoomInputting = false;
-    const num = parseInt(val, 10);
-    if(isNaN(num) || val === ''){
-      // 无效值，恢复到上一个有效值或默认值
-      const lastVal = this._zoomLastValue || 95;
-      this.applyZoom(lastVal);
-    } else {
-      this._zoomLastValue = num;
-      this.applyZoom(num);
-    }
-  },
   decBorder(){ 
     const current = parseInt(this.data.borderPx, 10) || 8;
     this.applyBorder(current - 1); 
@@ -638,14 +605,9 @@ Page({
     const current = parseInt(this.data.borderPx, 10) || 8;
     this.applyBorder(current + 1); 
   },
-  decZoom(){ 
-    const current = parseInt(this.data.zoomPct, 10) || 95;
-    this.applyZoom(current - 1); 
-  },
-  incZoom(){ 
-    const current = parseInt(this.data.zoomPct, 10) || 95;
-    this.applyZoom(current + 1); 
-  },
+  onImageZoomChanging(e){ this.applyImageZoom(e.detail.value, true); },
+  onImageZoomChange(e){ this.applyImageZoom(e.detail.value, true); },
+  resetCurrentImageZoom(){ this.applyImageZoom(100, false); },
 
   onInnerFrameStyleTap(e){
     const styleId = e.currentTarget.dataset.styleId;
@@ -888,9 +850,20 @@ Page({
     }
     this.setData({ borderPx: px }, this.redrawPreview);
   },
-  applyZoom(v){
-    const pct = Math.max(30, Math.min(150, parseInt(v,10) || 95));
-    this.setData({ zoomPct: pct, zoom: pct/100 }, this.redrawPreview);
+  applyImageZoom(v, showBadge){
+    const pct = Math.max(100, Math.min(200, parseInt(v, 10) || 100));
+    const imageZoom = pct / 100;
+    const index = this.data.curIndex;
+    const images = (this.data.images || []).map((item, itemIndex) =>
+      itemIndex === index ? { ...item, imageZoom } : item
+    );
+    if (this._imageZoomBadgeTimer) clearTimeout(this._imageZoomBadgeTimer);
+    this.setData({ images, imageZoom, imageZoomPct: pct, showZoomBadge: !!showBadge }, this.redrawPreview);
+    if (showBadge) {
+      this._imageZoomBadgeTimer = setTimeout(() => {
+        this.setData({ showZoomBadge: false });
+      }, 900);
+    }
   },
 
   // 预览画布
@@ -973,7 +946,8 @@ Page({
         frameEdgeLabelEnabled: this.data.frameEdgeLabelEnabled,
         frameNumberEnabled: this.data.frameNumberEnabled,
         frameMarkersEnabled: this.data.frameMarkersEnabled,
-        frameIndex: this.data.curIndex + 1
+        frameIndex: this.data.curIndex + 1,
+        imageZoom: Number(currentImage && currentImage.imageZoom) || 1
       });
     }, 50); // 50ms防抖延迟
   },
@@ -1040,7 +1014,8 @@ Page({
     frameEdgeLabelEnabled = true,
     frameNumberEnabled = true,
     frameMarkersEnabled = true,
-    frameIndex = 1
+    frameIndex = 1,
+    imageZoom = 1
   }){
     return new Promise((resolve)=>{
       const isCurrent = () => !renderToken || renderToken === this._renderToken;
@@ -1082,6 +1057,7 @@ Page({
             frameNumberEnabled,
             markersEnabled: frameMarkersEnabled,
             frameIndex,
+            imageZoom,
             maskImages,
             backgroundColor: enableOuterBg ? outerBgColor : 'transparent'
           }
@@ -1202,7 +1178,8 @@ Page({
           frameEdgeLabelEnabled: this.data.frameEdgeLabelEnabled,
           frameNumberEnabled: this.data.frameNumberEnabled,
           frameMarkersEnabled: this.data.frameMarkersEnabled,
-          frameIndex: i + 1
+          frameIndex: i + 1,
+          imageZoom: Number(record.imageZoom) || 1
         });
 
         await new Promise((resolve)=>{

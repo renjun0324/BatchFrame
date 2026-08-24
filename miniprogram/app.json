@@ -5,10 +5,10 @@
     ],
     "window": {
       "navigationBarTitleText": "批量边框助手",
-      "navigationBarBackgroundColor": "#111111",
-      "navigationBarTextStyle": "white",
+      "navigationBarBackgroundColor": "#F1EEE7",
+      "navigationBarTextStyle": "black",
       "backgroundTextStyle": "dark",
-      "backgroundColor": "#0f1115"
+      "backgroundColor": "#F1EEE7"
     },
     "permission": {
       "scope.writePhotosAlbum": {

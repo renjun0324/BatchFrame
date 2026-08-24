@@ -112,9 +112,35 @@ function testRendererReturnsLayout() {
   assert(calls.some(call => call.key === 'fillText'));
 }
 
+function testImageZoomStaysInsideAperture() {
+  const calls = [];
+  const ctx = new Proxy({}, { get: (_target, key) => (...args) => calls.push({ key, args }) });
+  const common = {
+    ctx,
+    outWidth: 1800,
+    outHeight: 1200,
+    image: { width: 4000, height: 3000 },
+    imageId: 'zoom-image',
+    imageSeed: 'zoom-image',
+    layoutSettings: { zoom: 0.95, layoutPadding: 18 },
+    outerBackgroundSettings: { enabled: true, color: '#FFFFFF' },
+    innerFrameSettings: { enabled: true, styleId: 'film-strip-35mm-full' }
+  };
+  const base = renderComposite(common);
+  const enlarged = renderComposite({
+    ...common,
+    innerFrameSettings: { ...common.innerFrameSettings, imageZoom: 1.5 }
+  });
+  assert.strictEqual(base.frameRect.width, enlarged.frameRect.width, 'image zoom must not resize the frame module');
+  assert.strictEqual(base.apertureRect.width, enlarged.apertureRect.width, 'image zoom must not resize the aperture');
+  assert(enlarged.imageDrawRect.width > base.imageDrawRect.width * 1.45);
+  assert(enlarged.imageDrawRect.height > base.imageDrawRect.height * 1.45);
+}
+
 test35mmRatios();
 testMinimalRatios();
 testNestedAndOrientation();
 testMarginOnlyChangesModulePlacement();
 testRendererReturnsLayout();
+testImageZoomStaysInsideAperture();
 console.log('film rebate layout tests passed');

@@ -3,7 +3,7 @@ const {
   getInnerFrameStyle,
   getStrengthPreset
 } = require('./innerFrameStyles');
-const { clamp, getFrameRect } = require('./frameGeometry');
+const { clamp, getFrameRect, calculateApertureImageRect } = require('./frameGeometry');
 
 const PROFILE_CACHE_LIMIT = 128;
 const profileCache = Object.create(null);
@@ -403,7 +403,7 @@ function drawFilmMarker(ctx, marker, color) {
   ctx.restore();
 }
 
-function drawFilmRebateLayoutFrame({ ctx, image, layout, style, color, backgroundColor, framePerforationsEnabled = true, frameEdgeLabelEnabled = true, frameNumberEnabled = true, frameMarkersEnabled = true, frameIndex = 1 }) {
+function drawFilmRebateLayoutFrame({ ctx, image, layout, style, color, backgroundColor, imageZoom = 1, framePerforationsEnabled = true, frameEdgeLabelEnabled = true, frameNumberEnabled = true, frameMarkersEnabled = true, frameIndex = 1 }) {
   if (!layout || !layout.frameRect || !layout.apertureRect) return null;
   const frame = layout.frameRect;
   const aperture = layout.apertureRect;
@@ -419,7 +419,13 @@ function drawFilmRebateLayoutFrame({ ctx, image, layout, style, color, backgroun
   ctx.save();
   traceLayoutRectPath(ctx, aperture);
   ctx.clip();
-  ctx.drawImage(image, aperture.x, aperture.y, aperture.width, aperture.height);
+  const imageDrawRect = calculateApertureImageRect({
+    apertureRect: aperture,
+    imageWidth: image.width,
+    imageHeight: image.height,
+    zoom: imageZoom
+  });
+  ctx.drawImage(image, imageDrawRect.x, imageDrawRect.y, imageDrawRect.width, imageDrawRect.height);
   ctx.restore();
 
   if (style.supportsPerforations && framePerforationsEnabled) {
@@ -437,6 +443,7 @@ function drawFilmRebateLayoutFrame({ ctx, image, layout, style, color, backgroun
     frameRect: frame,
     apertureRect: aperture,
     decorationRects: decoration,
+    imageDrawRect,
     orientation: layout.orientation,
     frameSizePreset: layout.frameSizePreset
   };
