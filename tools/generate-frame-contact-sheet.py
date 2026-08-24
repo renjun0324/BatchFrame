@@ -53,7 +53,7 @@ def polygon_frame(draw, box, width, wobble, rng):
     draw.polygon(points, fill="#050505")
 
 
-def compose(style, ratio=(4, 5), size=(520, 650)):
+def compose(style, ratio=(4, 5), size=(520, 650), strength="medium"):
     W, H = size
     canvas = Image.new("RGB", size, "#EEE9DF")
     draw = ImageDraw.Draw(canvas)
@@ -64,7 +64,8 @@ def compose(style, ratio=(4, 5), size=(520, 650)):
     if style == "clean-black":
         draw.rectangle((px - 7, py - 7, px + pw + 7, py + ph + 7), fill="#050505")
     elif style == "full-frame-scan":
-        polygon_frame(draw, (px, py, px + pw, py + ph), 11, 2, rng)
+        wobble = {"light": 1, "medium": 3, "strong": 7}.get(strength, 3)
+        polygon_frame(draw, (px, py, px + pw, py + ph), 11, wobble, rng)
     elif style == "film-gate":
         draw.rectangle((px - 17, py - 9, px + pw + 12, py + ph + 20), fill="#020202")
         draw.rectangle((px - 17, py - 9, px - 1, py + 18), fill="#020202")
@@ -81,8 +82,9 @@ def compose(style, ratio=(4, 5), size=(520, 650)):
         draw.ellipse((px - 18, py + ph // 2 - 9, px - 1, py + ph // 2 + 8), fill="#EEE9DF")
         draw.text((px - 24, py + ph + 4), "07", fill="#EEE9DF", font=font(15))
     elif style == "emulsion-damage":
-        polygon_frame(draw, (px, py, px + pw, py + ph), 15, 8, rng)
-        for _ in range(34):
+        wobble = {"light": 4, "medium": 8, "strong": 15}.get(strength, 8)
+        polygon_frame(draw, (px, py, px + pw, py + ph), 15, wobble, rng)
+        for _ in range({"light": 8, "medium": 22, "strong": 48}.get(strength, 22)):
             x = rng.choice([rng.randint(px - 28, px + 10), rng.randint(px + pw - 10, px + pw + 28)])
             y = rng.randint(py - 22, py + ph + 22)
             draw.ellipse((x, y, x + rng.randint(2, 8), y + rng.randint(2, 8)), fill="#030303")
@@ -125,6 +127,25 @@ def main():
         rd.text((x + 12, 14), label, fill="#1A1917", font=font(18))
         ratios.paste(compose(style, size=(280, 400)), (x + 16, 52))
     ratios.save(OUT / "ratio-comparison.png", optimize=True)
+
+    shape = Image.new("RGB", (1680, 500), "#DCD8D0")
+    sd = ImageDraw.Draw(shape)
+    for index, (label, style) in enumerate(STYLES[:4]):
+        x = index * 420
+        sd.text((x + 18, 14), label, fill="#1A1917", font=font(20))
+        shape.paste(compose(style, size=(390, 430)), (x + 15, 52))
+    shape.save(OUT / "shape-regression.png", optimize=True)
+
+    strength_sheet = Image.new("RGB", (1560, 900), "#DCD8D0")
+    ss = ImageDraw.Draw(strength_sheet)
+    for row, style in enumerate(("full-frame-scan", "emulsion-damage")):
+        label = "全幅扫描边" if row == 0 else "乳剂破损边"
+        ss.text((18, row * 440 + 12), label, fill="#1A1917", font=font(24))
+        for col, level in enumerate(("light", "medium", "strong")):
+            x = col * 520 + 18
+            ss.text((x, row * 440 + 52), {"light": "轻", "medium": "标准", "strong": "明显"}[level], fill="#4A4740", font=font(18))
+            strength_sheet.paste(compose(style, size=(480, 350), strength=level), (x, row * 440 + 82))
+    strength_sheet.save(OUT / "strength-comparison.png", optimize=True)
     print(f"wrote production review sheets under {OUT}")
 
 
