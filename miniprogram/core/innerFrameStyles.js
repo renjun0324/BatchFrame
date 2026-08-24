@@ -12,6 +12,19 @@ const FRAME_RENDERER_TYPES = Object.freeze({
   EMULSION_MASK: 'emulsion-mask'
 });
 
+const MATERIAL_STRENGTH_PRESETS = Object.freeze({
+  'full-frame-scan': Object.freeze({
+    light: Object.freeze({ maskTier: 'light', intrusionScale: 0.35, irregularityScale: 0.45, fragmentDensity: 0, fragmentSize: 0, notchCount: 1 }),
+    medium: Object.freeze({ maskTier: 'medium', intrusionScale: 0.7, irregularityScale: 0.85, fragmentDensity: 0, fragmentSize: 0, notchCount: 3 }),
+    strong: Object.freeze({ maskTier: 'strong', intrusionScale: 1.15, irregularityScale: 1.35, fragmentDensity: 0, fragmentSize: 0, notchCount: 6 })
+  }),
+  'emulsion-damage': Object.freeze({
+    light: Object.freeze({ maskTier: 'light', intrusionScale: 0.35, irregularityScale: 0.5, fragmentDensity: 0.025, fragmentSize: 0.7, notchCount: 2 }),
+    medium: Object.freeze({ maskTier: 'medium', intrusionScale: 0.72, irregularityScale: 0.95, fragmentDensity: 0.09, fragmentSize: 1.2, notchCount: 5 }),
+    strong: Object.freeze({ maskTier: 'strong', intrusionScale: 1.2, irregularityScale: 1.45, fragmentDensity: 0.2, fragmentSize: 2, notchCount: 10 })
+  })
+});
+
 const INNER_FRAME_STYLES = Object.freeze([
   {
     id: 'none', name: '无内框', renderer: FRAME_RENDERER_TYPES.NONE,
@@ -28,6 +41,7 @@ const INNER_FRAME_STYLES = Object.freeze([
   {
     id: 'full-frame-scan', name: '全幅扫描边', renderer: FRAME_RENDERER_TYPES.SEGMENTED_MASK,
     color: '#050505', widthAt1800: 12, supportsStrength: true, supportsColor: false,
+    strengthPresets: MATERIAL_STRENGTH_PRESETS['full-frame-scan'],
     maskRoot: 'assets/frame-masks/full-frame-scan', maskVariants: 3,
     previewAsset: '/assets/frame-previews/full-frame-scan.png',
     supportedRatios: ['1:1', '2:3', '3:4', '4:5', '9:16', '16:9']
@@ -53,6 +67,7 @@ const INNER_FRAME_STYLES = Object.freeze([
   {
     id: 'emulsion-damage', name: '乳剂破损边', renderer: FRAME_RENDERER_TYPES.EMULSION_MASK,
     color: '#030303', widthAt1800: 18, supportsStrength: true, supportsColor: false,
+    strengthPresets: MATERIAL_STRENGTH_PRESETS['emulsion-damage'],
     maskRoot: 'assets/frame-masks/emulsion-damage', maskVariants: 3,
     previewAsset: '/assets/frame-previews/emulsion-damage.png',
     supportedRatios: ['1:1', '2:3', '3:4', '4:5', '9:16', '16:9']
@@ -84,6 +99,13 @@ function getEdgeStrength(level) {
   return item ? item.value : 1;
 }
 
+function getStrengthPreset(styleId, level = 'medium') {
+  const style = getInnerFrameStyle(styleId);
+  const presets = style.strengthPresets;
+  if (!presets) return { maskTier: level, intrusionScale: 1, irregularityScale: 1, fragmentDensity: 0, fragmentSize: 1, notchCount: 0 };
+  return presets[level] || presets.medium || presets.light;
+}
+
 module.exports = {
   FRAME_RENDERER_TYPES,
   INNER_FRAME_STYLES,
@@ -91,5 +113,6 @@ module.exports = {
   LEGACY_STYLE_IDS,
   migrateInnerFrameStyleId,
   getInnerFrameStyle,
-  getEdgeStrength
+  getEdgeStrength,
+  getStrengthPreset
 };

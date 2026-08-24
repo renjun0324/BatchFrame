@@ -1,6 +1,7 @@
 const {
   FRAME_RENDERER_TYPES,
-  getInnerFrameStyle
+  getInnerFrameStyle,
+  getStrengthPreset
 } = require('./innerFrameStyles');
 const { clamp, getFrameRect } = require('./frameGeometry');
 
@@ -39,11 +40,12 @@ function usesNormalizedProfile(style) {
     style.renderer === FRAME_RENDERER_TYPES.EMULSION_MASK;
 }
 
-function generateNormalizedEdgeProfile({ styleId = 'clean-black', seed = 'default', strength = 1, pointCount = 32 } = {}) {
+function generateNormalizedEdgeProfile({ styleId = 'clean-black', seed = 'default', strength = 1, strengthLevel = 'medium', pointCount = 32 } = {}) {
   const style = getInnerFrameStyle(styleId);
   const count = Math.max(8, Math.min(64, Math.floor(pointCount)));
-  const effectiveStrength = clamp(Number(strength) || 0, 0, 1.5);
-  const random = createSeededRandom(`${style.id}:${seed}`);
+  const preset = getStrengthPreset(style.id, strengthLevel);
+  const effectiveStrength = clamp((Number(strength) || 1) * preset.irregularityScale, 0, 2.5);
+  const random = createSeededRandom(`${style.id}:${seed}:${strengthLevel}`);
 
   function createSide(sideIndex) {
     if (!usesNormalizedProfile(style)) {
@@ -71,28 +73,30 @@ function getCachedNormalizedEdgeProfile(options = {}) {
   const styleId = options.styleId || 'clean-black';
   const seed = options.seed == null ? 'default' : options.seed;
   const strength = options.strength == null ? 1 : options.strength;
+  const strengthLevel = options.strengthLevel || 'medium';
   const pointCount = options.pointCount == null ? 32 : options.pointCount;
-  const key = `${styleId}|${seed}|${strength}|${pointCount}`;
+  const key = `${styleId}|${seed}|${strengthLevel}|${strength}|${pointCount}`;
   if (profileCache[key]) return profileCache[key];
-  const profile = generateNormalizedEdgeProfile({ styleId, seed, strength, pointCount });
+  const profile = generateNormalizedEdgeProfile({ styleId, seed, strength, strengthLevel, pointCount });
   profileCache[key] = profile;
   profileCacheOrder.push(key);
   if (profileCacheOrder.length > PROFILE_CACHE_LIMIT) delete profileCache[profileCacheOrder.shift()];
   return profile;
 }
 
-function selectMaskVariant(styleId, seed) {
+function selectMaskVariant(styleId, seed, strengthLevel = 'medium') {
   const style = getInnerFrameStyle(styleId);
   const count = Math.max(1, Number(style.maskVariants) || 1);
-  return hashSeed(`${style.id}:${seed}:mask`) % count + 1;
+  return hashSeed(`${style.id}:${strengthLevel}:${seed}:mask`) % count + 1;
 }
 
-function getMaskAssetPaths(styleId, variant) {
+function getMaskAssetPaths(styleId, variant, strengthLevel = 'medium') {
   const style = getInnerFrameStyle(styleId);
   if (!style.maskRoot || !style.maskVariants) return null;
   const selected = Math.max(1, Math.min(style.maskVariants, Number(variant) || 1));
+  const tier = getStrengthPreset(style.id, strengthLevel).maskTier || strengthLevel;
   return MASK_SEGMENTS.reduce((result, segment) => {
-    result[segment] = `/${style.maskRoot}/variant-${String(selected).padStart(2, '0')}/${segment}.png`;
+    result[segment] = `/${style.maskRoot}/${tier}/variant-${String(selected).padStart(2, '0')}/${segment}.png`;
     return result;
   }, {});
 }
@@ -101,13 +105,16 @@ function edgeValue(profile, side, index) {
   return profile[side] && profile[side][index] ? profile[side][index].value : 0;
 }
 
-function buildFramePaths({ photoRect, frameWidth, styleId = 'clean-black', seed = 'default', strength = 1, pointCount = 32 } = {}) {
+function buildFramePaths({ photoRect, frameWidth, styleId = 'clean-black', seed = 'default', strength = 1, strengthLevel = 'medium', pointCount = 32 } = {}) {
   const width = Math.max(0, Number(frameWidth) || 0);
   const style = getInnerFrameStyle(styleId);
   if (style.id === 'none' || width <= 0) return null;
-  const profile = getCachedNormalizedEdgeProfile({ styleId: style.id, seed, strength, pointCount });
-  const outerVariation = width * (style.renderer === FRAME_RENDERER_TYPES.EMULSION_MASK ? 0.72 : 0.34);
-  const innerVariation = Math.min(width * 0.34, outerVariation * 0.36);
+  const preset = getStrengthPreset(style.id, strengthLevel);
+  const profile = getCachedNormalizedEdgeProfile({ styleId: style.id, seed, strength, strengthLevel, pointCount });
+  const baseVariation = style.renderer === FRAME_RENDERER_TYPES.EMULSION_MASK ? 0.18 : 0.18;
+  const variationRange = style.renderer === FRAME_RENDERER_TYPES.EMULSION_MASK ? 0.38 : 0.36;
+  const outerVariation = width * (baseVariation + variationRange * preset.intrusionScale);
+  const innerVariation = Math.min(width * (style.renderer === FRAME_RENDERER_TYPES.EMULSION_MASK ? 0.28 : 0.34), outerVariation * (style.renderer === FRAME_RENDERER_TYPES.EMULSION_MASK ? 0.42 : 0.36));
   const count = profile.top.length;
   const outer = [];
   const inner = [];
@@ -135,7 +142,7 @@ function buildFramePaths({ photoRect, frameWidth, styleId = 'clean-black', seed 
     outer.push({ x: photoRect.x - width - value * outerVariation, y: photoRect.y + photoRect.height * t });
     inner.push({ x: photoRect.x + value * innerVariation, y: photoRect.y + photoRect.height * t });
   }
-  return { outer, inner, profile, frameRect: getFrameRect(photoRect, width), outerVariation, innerVariation };
+  return { outer, inner, profile, frameRect: getFrameRect(photoRect, width), outerVariation, innerVariation, strengthPreset: preset };
 }
 
 function midpoint(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
@@ -150,6 +157,39 @@ function traceSmoothPath(ctx, points) {
     const nextMid = midpoint(current, points[(i + 1) % points.length]);
     ctx.quadraticCurveTo(current.x, current.y, nextMid.x, nextMid.y);
   }
+  ctx.closePath();
+}
+
+function traceHardPolygonPath(ctx, points) {
+  if (!points || points.length < 3) return;
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i].x, points[i].y);
+  ctx.closePath();
+}
+
+function traceRectPath(ctx, rect) {
+  ctx.beginPath();
+  if (typeof ctx.rect === 'function') {
+    ctx.rect(rect.x, rect.y, rect.width, rect.height);
+  } else {
+    ctx.moveTo(rect.x, rect.y);
+    ctx.lineTo(rect.x + rect.width, rect.y);
+    ctx.lineTo(rect.x + rect.width, rect.y + rect.height);
+    ctx.lineTo(rect.x, rect.y + rect.height);
+    ctx.closePath();
+  }
+}
+
+// Irregular edges are traced side-by-side so the four corners remain explicit.
+// A single midpoint-smoothed closed path would turn a four-point rectangle into
+// a capsule; this function never smooths across a corner.
+function traceSideAwareProfilePath(ctx, points, pointCount) {
+  if (!points || points.length < 4) return;
+  const count = pointCount || Math.max(1, Math.floor(points.length / 4));
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i].x, points[i].y);
   ctx.closePath();
 }
 
@@ -169,17 +209,13 @@ function rectanglePaths(photoRect, top, right, bottom, left) {
   return { outer, inner, frameRect: { x: photoRect.x - left, y: photoRect.y - top, width: photoRect.width + left + right, height: photoRect.height + top + bottom } };
 }
 
-function fillAndClipPhoto(ctx, image, photoRect, paths, color) {
+function fillHardFrameAndPhoto(ctx, image, photoRect, paths, color) {
   ctx.save();
-  traceSmoothPath(ctx, paths.outer);
+  traceHardPolygonPath(ctx, paths.outer);
   ctx.fillStyle = color;
   ctx.fill();
   ctx.restore();
-  ctx.save();
-  traceSmoothPath(ctx, paths.inner);
-  ctx.clip();
   ctx.drawImage(image, photoRect.x, photoRect.y, photoRect.width, photoRect.height);
-  ctx.restore();
 }
 
 function drawWithoutFrame({ ctx, image, photoRect }) {
@@ -189,11 +225,13 @@ function drawWithoutFrame({ ctx, image, photoRect }) {
 
 function drawCleanFrame({ ctx, image, photoRect, frameWidth, color }) {
   const paths = rectanglePaths(photoRect, frameWidth, frameWidth, frameWidth, frameWidth);
-  fillAndClipPhoto(ctx, image, photoRect, paths, color);
+  ctx.fillStyle = color;
+  ctx.fillRect(paths.frameRect.x, paths.frameRect.y, paths.frameRect.width, paths.frameRect.height);
+  ctx.drawImage(image, photoRect.x, photoRect.y, photoRect.width, photoRect.height);
   return paths;
 }
 
-function drawSegmentedMaskFrame({ ctx, image, photoRect, frameWidth, color, styleId, seed, strength, maskImages }) {
+function drawSegmentedMaskFrame({ ctx, image, photoRect, frameWidth, color, styleId, seed, strength, strengthLevel = 'medium', maskImages }) {
   if (!maskImages || !MASK_SEGMENTS.every(segment => maskImages[segment])) return drawCleanFrame({ ctx, image, photoRect, frameWidth, color });
   const style = getInnerFrameStyle(styleId);
   const frameRect = getFrameRect(photoRect, frameWidth);
@@ -217,19 +255,20 @@ function drawSegmentedMaskFrame({ ctx, image, photoRect, frameWidth, color, styl
     ctx.drawImage(maskImages[segment], box[0], box[1], box[2], box[3]);
   });
   ctx.restore();
-  const paths = buildFramePaths({ photoRect, frameWidth, styleId: style.id, seed, strength: Math.max(0.55, strength), pointCount: 32 });
+  const paths = buildFramePaths({ photoRect, frameWidth, styleId: style.id, seed, strength: Math.max(0.55, strength), strengthLevel, pointCount: 32 });
   ctx.save();
-  traceSmoothPath(ctx, paths.inner);
+  traceSideAwareProfilePath(ctx, paths.inner, 32);
   ctx.clip();
   ctx.drawImage(image, photoRect.x, photoRect.y, photoRect.width, photoRect.height);
   ctx.restore();
-  return { ...paths, maskVariant: selectMaskVariant(style.id, seed) };
+  return { ...paths, maskVariant: selectMaskVariant(style.id, seed, strengthLevel) };
 }
 
 function drawEmulsionDamageFrame(options) {
   const paths = drawSegmentedMaskFrame(options);
   if (!paths || !paths.outer) return paths;
-  drawFragments(options.ctx, paths, `${options.seed}:emulsion`, options.color, 0.12 * Math.max(0.7, options.strength));
+  const preset = getStrengthPreset('emulsion-damage', options.strengthLevel || 'medium');
+  drawFragments(options.ctx, paths, `${options.seed}:emulsion`, options.color, preset.fragmentDensity, preset.fragmentSize);
   return paths;
 }
 
@@ -240,7 +279,7 @@ function drawFilmGateFrame({ ctx, image, photoRect, frameWidth, color, seed }) {
   const bottom = frameWidth * (1.18 + random() * 0.16);
   const left = frameWidth * (1.08 + random() * 0.18);
   const paths = rectanglePaths(photoRect, top, right, bottom, left);
-  fillAndClipPhoto(ctx, image, photoRect, paths, color);
+  fillHardFrameAndPhoto(ctx, image, photoRect, paths, color);
   // Hard片门 corners: a small deterministic accumulation, not random noise.
   ctx.save();
   ctx.fillStyle = color;
@@ -295,7 +334,7 @@ function drawFrameCode(ctx, frameRect, frameWidth, seed, backgroundColor) {
 
 function drawPerforatedFilmFrame({ ctx, image, photoRect, frameWidth, color, seed, backgroundColor }) {
   const paths = rectanglePaths(photoRect, frameWidth, frameWidth, frameWidth, frameWidth);
-  fillAndClipPhoto(ctx, image, photoRect, paths, color);
+  fillHardFrameAndPhoto(ctx, image, photoRect, paths, color);
   drawPerforations(ctx, paths.frameRect, frameWidth, backgroundColor, seed);
   drawFrameCode(ctx, paths.frameRect, frameWidth, seed, backgroundColor);
   return { ...paths, perforationPitch: Math.max(frameWidth * 1.28, frameWidth * 0.9) };
@@ -308,7 +347,7 @@ function drawMediumFormatFrame({ ctx, image, photoRect, frameWidth, color, seed,
   const bottom = frameWidth * (1.28 + random() * 0.16);
   const left = frameWidth * (1.5 + random() * 0.2);
   const paths = rectanglePaths(photoRect, top, right, bottom, left);
-  fillAndClipPhoto(ctx, image, photoRect, paths, color);
+  fillHardFrameAndPhoto(ctx, image, photoRect, paths, color);
   ctx.save();
   ctx.fillStyle = backgroundColor && backgroundColor !== 'transparent' ? backgroundColor : '#FFFFFF';
   if (typeof ctx.arc === 'function') {
@@ -321,16 +360,16 @@ function drawMediumFormatFrame({ ctx, image, photoRect, frameWidth, color, seed,
   return { ...paths, mediumFormat: true };
 }
 
-function drawFragments(ctx, paths, seed, color, density) {
+function drawFragments(ctx, paths, seed, color, density, sizeScale = 1) {
   const random = createSeededRandom(`${seed}:fragments`);
-  const count = Math.max(2, Math.round(density * 72));
+  const count = Math.max(0, Math.round(density * 72));
   ctx.save();
   ctx.fillStyle = color;
   for (let i = 0; i < count; i += 1) {
     const start = Math.floor(random() * paths.outer.length);
     const point = paths.outer[start];
     const next = paths.outer[(start + 1) % paths.outer.length];
-    const size = 0.5 + random() * 2.2;
+    const size = (0.5 + random() * 2.2) * sizeScale;
     const dx = next.x - point.x;
     const dy = next.y - point.y;
     const length = Math.max(1, Math.sqrt(dx * dx + dy * dy));
@@ -374,6 +413,9 @@ module.exports = {
   selectMaskVariant,
   getMaskAssetPaths,
   buildFramePaths,
+  traceHardPolygonPath,
+  traceRectPath,
+  traceSideAwareProfilePath,
   traceSmoothPath,
   drawImageWithInnerFrame,
   drawImageWithSegmentedMask: drawSegmentedMaskFrame,

@@ -4,7 +4,8 @@ const path = require('path');
 const {
   FRAME_RENDERER_TYPES,
   INNER_FRAME_STYLES,
-  getInnerFrameStyle
+  getInnerFrameStyle,
+  getStrengthPreset
 } = require('../miniprogram/core/innerFrameStyles');
 const {
   calculateImageRect,
@@ -15,7 +16,8 @@ const {
   buildFramePaths,
   selectMaskVariant,
   getMaskAssetPaths,
-  FRAME_RENDERERS
+  FRAME_RENDERERS,
+  drawImageWithInnerFrame
 } = require('../miniprogram/core/innerFrameRenderer');
 const { renderComposite } = require('../miniprogram/core/compositeRenderer');
 
@@ -26,7 +28,11 @@ function testDeterminism() {
   assert.deepStrictEqual(first, second, 'same seed must produce the same profile');
   assert.notDeepStrictEqual(first, other, 'different seeds should produce different profiles');
   assert.strictEqual(selectMaskVariant('full-frame-scan', 'image-1'), selectMaskVariant('full-frame-scan', 'image-1'));
-  assert(Object.keys(getMaskAssetPaths('emulsion-damage', 2)).length === 8);
+  assert(Object.keys(getMaskAssetPaths('emulsion-damage', 2, 'light')).length === 8);
+  assert.notStrictEqual(
+    getMaskAssetPaths('emulsion-damage', 2, 'light').top,
+    getMaskAssetPaths('emulsion-damage', 2, 'strong').top
+  );
 }
 
 function testStyleRegistry() {
@@ -187,10 +193,56 @@ function testDedicatedRenderers() {
   });
 }
 
+function recordingContext() {
+  const calls = [];
+  const ctx = new Proxy({}, {
+    get(_target, key) {
+      return (...args) => calls.push({ name: key, args });
+    },
+    set(_target, key, value) {
+      calls.push({ name: `set:${key}`, args: [value] });
+      return true;
+    }
+  });
+  return { ctx, calls };
+}
+
+function testHardRenderersKeepRectangularWindows() {
+  const image = { width: 1200, height: 800 };
+  const photoRect = { x: 300, y: 240, width: 900, height: 600 };
+  ['clean-black', 'film-gate', 'negative-35mm', 'medium-format-120'].forEach(styleId => {
+    const { ctx, calls } = recordingContext();
+    drawImageWithInnerFrame({
+      ctx, image, photoRect, frameWidth: getInnerFrameStyle(styleId).widthAt1800,
+      styleId, seed: 'shape-seed', color: '#050505', backgroundColor: '#FFFFFF'
+    });
+    assert(!calls.some(call => call.name === 'quadraticCurveTo' || call.name === 'bezierCurveTo'), `${styleId} must not curve the photo window`);
+    const draw = calls.find(call => call.name === 'drawImage');
+    assert(draw, `${styleId} must draw the photo`);
+    assert.deepStrictEqual(draw.args.slice(-4), [photoRect.x, photoRect.y, photoRect.width, photoRect.height]);
+  });
+}
+
+function testStrengthSemantics() {
+  const photoRect = { x: 300, y: 240, width: 1200, height: 720 };
+  const light = buildFramePaths({ photoRect, frameWidth: 18, styleId: 'full-frame-scan', seed: 'strength-seed', strengthLevel: 'light' });
+  const strong = buildFramePaths({ photoRect, frameWidth: 18, styleId: 'full-frame-scan', seed: 'strength-seed', strengthLevel: 'strong' });
+  assert(strong.outerVariation > light.outerVariation * 1.5, 'strong scan profile should have substantially greater intrusion range');
+  assert(getStrengthPreset('emulsion-damage', 'strong').fragmentDensity > getStrengthPreset('emulsion-damage', 'light').fragmentDensity * 2);
+  assert(getStrengthPreset('emulsion-damage', 'strong').fragmentSize > getStrengthPreset('emulsion-damage', 'light').fragmentSize);
+  const lightProfile = generateNormalizedEdgeProfile({ styleId: 'full-frame-scan', seed: 'strength-seed', strengthLevel: 'light' });
+  const strongProfile = generateNormalizedEdgeProfile({ styleId: 'full-frame-scan', seed: 'strength-seed', strengthLevel: 'strong' });
+  const lightPeak = Math.max(...lightProfile.top.map(point => Math.abs(point.value)));
+  const strongPeak = Math.max(...strongProfile.top.map(point => Math.abs(point.value)));
+  assert(strongPeak > lightPeak * 1.5, 'strong scan profile should move more than light');
+}
+
 testStyleRegistry();
 testDeterminism();
 testPathBoundsAndThickness();
 testGeometryAndScaling();
 testRenderEntryPoint();
 testDedicatedRenderers();
+testHardRenderersKeepRectangularWindows();
+testStrengthSemantics();
 console.log('film inner frame tests passed');

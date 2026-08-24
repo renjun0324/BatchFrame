@@ -930,11 +930,11 @@ Page({
     }
   },
 
-  loadFrameMasks(canvas, styleId, seed){
-    const variant = selectMaskVariant(styleId, seed || 'default');
-    const paths = getMaskAssetPaths(styleId, variant);
+  loadFrameMasks(canvas, styleId, seed, strengthLevel = 'medium'){
+    const variant = selectMaskVariant(styleId, seed || 'default', strengthLevel);
+    const paths = getMaskAssetPaths(styleId, variant, strengthLevel);
     if (!paths) return Promise.resolve(null);
-    const cacheKey = `${styleId}:${variant}`;
+    const cacheKey = `${styleId}:${strengthLevel}:${variant}`;
     if (this._frameMaskCache && this._frameMaskCache[cacheKey]) {
       return Promise.resolve(this._frameMaskCache[cacheKey]);
     }
@@ -982,7 +982,7 @@ Page({
         }
         let maskImages = null;
         try {
-          maskImages = await this.loadFrameMasks(canvas, innerFrameStyleId, imageSeed || imageId || imgPath);
+          maskImages = await this.loadFrameMasks(canvas, innerFrameStyleId, imageSeed || imageId || imgPath, edgeStrengthLevel);
         } catch (error) {
           console.warn('[frame-mask] asset load failed, falling back to clean frame', error);
         }

@@ -48,7 +48,8 @@ function renderComposite({
     ? (Number(innerFrameSettings.widthAt1800) || style.widthAt1800)
     : 0;
   const frameWidth = scaleFrameWidth(widthAt1800, longEdge);
-  const strength = getEdgeStrength(innerFrameSettings.strengthLevel) * (Number(innerFrameSettings.strength) || 1);
+  const strengthLevel = innerFrameSettings.strengthLevel || 'medium';
+  const strength = getEdgeStrength(strengthLevel) * (Number(innerFrameSettings.strength) || 1);
   const frameColor = style.id === 'clean-black'
     ? (innerFrameSettings.color || style.color)
     : style.color;
@@ -62,6 +63,7 @@ function renderComposite({
     color: enabled ? frameColor : undefined,
     seed: imageSeed || imageId || 'default',
     strength,
+    strengthLevel,
     maskImages: innerFrameSettings.maskImages,
     backgroundColor: outerBackgroundSettings.enabled ? outerBackgroundSettings.color : 'transparent'
   });
