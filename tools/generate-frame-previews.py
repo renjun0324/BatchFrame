@@ -61,14 +61,22 @@ def render(style):
         draw.rectangle((box[0] - 7, box[1] - 4, box[2] + 5, box[3] + 8), fill="#020202")
         draw.rectangle((box[0] - 7, box[1] - 4, box[0] + 3, box[1] + 7), fill="#020202")
         canvas.paste(photo, (box[0], box[1]))
-    elif style == "negative-35mm":
+    elif style == "film-strip-35mm-full":
         draw.rectangle((box[0] - 9, box[1] - 12, box[2] + 9, box[3] + 12), fill="#020202")
         hole_w, hole_h, gap = 8, 5, 15
         for x in range(box[0] - 2, box[2] + 2, gap):
             draw.rounded_rectangle((x, box[1] - 10, x + hole_w, box[1] - 10 + hole_h), radius=2, fill="#EEE9DF")
             draw.rounded_rectangle((x, box[3] + 5, x + hole_w, box[3] + 5 + hole_h), radius=2, fill="#EEE9DF")
         canvas.paste(photo, (box[0], box[1]))
-        draw.text((box[0] + 43, box[1] - 9), "12A", fill="#EEE9DF")
+        draw.text((box[0] + 30, box[1] - 9), "BF COLOR 400", fill="#F3A126")
+        draw.text((box[0] + 7, box[3] + 4), "01A", fill="#F3A126")
+    elif style == "film-rebate-minimal":
+        draw.rectangle((box[0] - 4, box[1] - 4, box[2] + 4, box[3] + 4), fill="#030303")
+        canvas.paste(photo, (box[0], box[1]))
+        draw.text((box[0] + 5, box[1] - 2), "BF 400", fill="#F3A126")
+        draw.text((box[0] + 52, box[3] + 1), "02", fill="#F3A126")
+        draw.polygon([(box[0] + 5, box[3] + 8), (box[0] + 11, box[3] + 4), (box[0] + 11, box[3] + 8)], fill="#F3A126")
+        draw.polygon([(box[2] - 11, box[3] + 8), (box[2] - 5, box[3] + 4), (box[2] - 5, box[3] + 8)], fill="#F3A126")
     elif style == "medium-format-120":
         draw.rectangle((box[0] - 13, box[1] - 8, box[2] + 7, box[3] + 9), fill="#030303")
         canvas.paste(photo, (box[0], box[1]))
@@ -86,7 +94,7 @@ def render(style):
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
-    for style in ("none", "clean-black", "full-frame-scan", "film-gate", "negative-35mm", "medium-format-120", "emulsion-damage"):
+    for style in ("none", "clean-black", "full-frame-scan", "film-gate", "film-strip-35mm-full", "film-rebate-minimal", "medium-format-120", "emulsion-damage"):
         image = render(style)
         image.save(OUT / f"{style}.png", optimize=True)
     print(f"generated selector previews under {OUT}")
