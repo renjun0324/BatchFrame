@@ -2,7 +2,16 @@
   "compileType": "miniprogram",
   "libVersion": "3.11.1",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "docs/design-v3"
+      },
+      {
+        "type": "folder",
+        "value": "tools/design-v3"
+      }
+    ],
     "include": []
   },
   "setting": {
