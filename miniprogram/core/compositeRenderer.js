@@ -1,6 +1,7 @@
 const { getInnerFrameStyle, getEdgeStrength } = require('./innerFrameStyles');
 const { calculateImageRect, getLongEdge, scaleFrameWidth } = require('./frameGeometry');
 const { drawImageWithInnerFrame } = require('./innerFrameRenderer');
+const { layoutInnerFrame } = require('./innerFrameLayout');
 
 /**
  * The only Canvas composition entry point used by preview and export.
@@ -31,6 +32,45 @@ function renderComposite({
   }
 
   if (!image) return { imageRect: null, frameWidth: 0, styleId: 'none' };
+  const style = getInnerFrameStyle(innerFrameSettings.styleId);
+  const enabled = innerFrameSettings.enabled !== false && style.id !== 'none';
+  if (enabled && style.layoutModel === 'film-rebate') {
+    const layout = layoutInnerFrame({
+      outputRect: { x: 0, y: 0, width, height },
+      outerLayout: {
+        padding: layoutSettings.layoutPadding == null ? 18 : layoutSettings.layoutPadding,
+        zoom: layoutSettings.zoom == null ? 1 : layoutSettings.zoom
+      },
+      imageAspect: image.width / Math.max(1, image.height),
+      style,
+      frameSizePreset: innerFrameSettings.frameSizePreset || 'standard',
+      orientation: image.width < image.height ? 'portrait' : 'landscape'
+    });
+    const filmPaths = drawImageWithInnerFrame({
+      ctx,
+      image,
+      styleId: style.id,
+      style,
+      layout,
+      color: style.color,
+      backgroundColor: outerBackgroundSettings.enabled ? outerBackgroundSettings.color : 'transparent',
+      framePerforationsEnabled: innerFrameSettings.perforationsEnabled !== false,
+      frameEdgeLabelEnabled: innerFrameSettings.edgeLabelEnabled !== false,
+      frameNumberEnabled: innerFrameSettings.frameNumberEnabled !== false,
+      frameMarkersEnabled: innerFrameSettings.markersEnabled !== false,
+      frameIndex: innerFrameSettings.frameIndex || 1
+    });
+    return {
+      imageRect: layout.apertureRect,
+      frameWidth: 0,
+      styleId: style.id,
+      frameRect: layout.frameRect,
+      apertureRect: layout.apertureRect,
+      decorationRects: layout.decorationRects,
+      paths: filmPaths
+    };
+  }
+
   const imageRect = calculateImageRect({
     outWidth: width,
     outHeight: height,
@@ -41,8 +81,6 @@ function renderComposite({
     layoutPadding: layoutSettings.layoutPadding
   });
 
-  const style = getInnerFrameStyle(innerFrameSettings.styleId);
-  const enabled = innerFrameSettings.enabled !== false && style.id !== 'none';
   const longEdge = getLongEdge(width, height);
   const widthAt1800 = enabled
     ? (Number(innerFrameSettings.widthAt1800) || style.widthAt1800)

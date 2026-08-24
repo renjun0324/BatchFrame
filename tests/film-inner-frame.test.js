@@ -36,7 +36,7 @@ function testDeterminism() {
 }
 
 function testStyleRegistry() {
-  const expected = ['none', 'clean-black', 'full-frame-scan', 'film-gate', 'negative-35mm', 'medium-format-120', 'emulsion-damage'];
+  const expected = ['none', 'clean-black', 'full-frame-scan', 'film-gate', 'film-strip-35mm-full', 'film-rebate-minimal', 'medium-format-120', 'emulsion-damage'];
   assert.deepStrictEqual(INNER_FRAME_STYLES.map(style => style.id), expected);
   INNER_FRAME_STYLES.forEach(style => {
     assert(FRAME_RENDERERS[style.renderer], `${style.id} must have a renderer`);
@@ -45,7 +45,8 @@ function testStyleRegistry() {
     assert(fs.existsSync(previewPath), `${style.id} selector preview must exist`);
     assert(fs.statSync(previewPath).size > 0, `${style.id} selector preview must be non-empty`);
     if (style.id === 'film-gate') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.FILM_GATE);
-    if (style.id === 'negative-35mm') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.PERFORATED_FILM);
+    if (style.id === 'film-strip-35mm-full') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.FILM_REBATE_LAYOUT);
+    if (style.id === 'film-rebate-minimal') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.FILM_REBATE_LAYOUT);
     if (style.id === 'medium-format-120') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.MEDIUM_FORMAT_REBATE);
   });
 }
@@ -53,7 +54,7 @@ function testStyleRegistry() {
 function testPathBoundsAndThickness() {
   const photoRect = { x: 300, y: 240, width: 1200, height: 720 };
   for (const style of INNER_FRAME_STYLES) {
-    if (style.id === 'none') continue;
+    if (style.id === 'none' || style.layoutModel === 'film-rebate') continue;
     const paths = buildFramePaths({
       photoRect,
       frameWidth: scaleFrameWidth(style.widthAt1800, 1800),
@@ -178,7 +179,7 @@ function testDedicatedRenderers() {
     'top-left': {}, top: {}, 'top-right': {}, right: {},
     'bottom-right': {}, bottom: {}, 'bottom-left': {}, left: {}
   };
-  ['film-gate', 'negative-35mm', 'medium-format-120', 'emulsion-damage'].forEach(styleId => {
+  ['film-gate', 'film-strip-35mm-full', 'film-rebate-minimal', 'medium-format-120', 'emulsion-damage'].forEach(styleId => {
     const result = renderComposite({
       ctx, outWidth: 1800, outHeight: 1200, image, imageId: styleId,
       imageSeed: 'stable-seed',
@@ -210,7 +211,7 @@ function recordingContext() {
 function testHardRenderersKeepRectangularWindows() {
   const image = { width: 1200, height: 800 };
   const photoRect = { x: 300, y: 240, width: 900, height: 600 };
-  ['clean-black', 'film-gate', 'negative-35mm', 'medium-format-120'].forEach(styleId => {
+  ['clean-black', 'film-gate', 'medium-format-120'].forEach(styleId => {
     const { ctx, calls } = recordingContext();
     drawImageWithInnerFrame({
       ctx, image, photoRect, frameWidth: getInnerFrameStyle(styleId).widthAt1800,

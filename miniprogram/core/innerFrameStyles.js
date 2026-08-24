@@ -9,7 +9,8 @@ const FRAME_RENDERER_TYPES = Object.freeze({
   FILM_GATE: 'film-gate',
   PERFORATED_FILM: 'perforated-film',
   MEDIUM_FORMAT_REBATE: 'medium-format-rebate',
-  EMULSION_MASK: 'emulsion-mask'
+  EMULSION_MASK: 'emulsion-mask',
+  FILM_REBATE_LAYOUT: 'film-rebate-layout'
 });
 
 const MATERIAL_STRENGTH_PRESETS = Object.freeze({
@@ -47,19 +48,69 @@ const INNER_FRAME_STYLES = Object.freeze([
     supportedRatios: ['1:1', '2:3', '3:4', '4:5', '9:16', '16:9']
   },
   {
-    id: 'film-gate', name: '片门压框', renderer: FRAME_RENDERER_TYPES.FILM_GATE,
+    id: 'film-gate', name: '片门压框', category: 'basic-frame', renderer: FRAME_RENDERER_TYPES.FILM_GATE,
     color: '#020202', widthAt1800: 24, supportsStrength: false, supportsColor: false,
     variants: 3, previewAsset: '/assets/frame-previews/film-gate.png',
     supportedRatios: ['1:1', '2:3', '3:4', '4:5', '9:16', '16:9']
   },
   {
-    id: 'negative-35mm', name: '35mm 负片', renderer: FRAME_RENDERER_TYPES.PERFORATED_FILM,
-    color: '#020202', widthAt1800: 52, supportsStrength: false, supportsColor: false,
-    variants: 3, previewAsset: '/assets/frame-previews/negative-35mm.png',
-    supportedRatios: ['2:3', '3:4', '4:5', '16:9']
+    id: 'film-strip-35mm-full', name: '35mm 完整片基', category: 'film-rebate',
+    renderer: FRAME_RENDERER_TYPES.FILM_REBATE_LAYOUT, layoutModel: 'film-rebate',
+    color: '#030303', supportsColor: false, supportsStrength: false,
+    supportsFrameSize: true, supportsPerforations: true, supportsEdgeLabel: true,
+    supportsFrameNumber: true, supportsMarkers: true,
+    previewAsset: '/assets/frame-previews/film-strip-35mm-full.png',
+    supportedRatios: ['1:1', '2:3', '3:4', '4:5', '16:9'],
+    geometry: {
+      frameAspectPolicy: 'derived-from-aperture',
+      rebates: { topRatio: 0.154, rightRatio: 0.027, bottomRatio: 0.154, leftRatio: 0.027 }
+    },
+    perforations: { enabled: true, sides: ['top', 'bottom'], shape: 'rounded-rect', count: 8, widthRatio: 0.055, heightRatio: 0.077, cornerRadiusRatio: 0.018 },
+    labels: { enabled: true, position: 'top-left', textPreset: 'BATCHFRAME COLOR 400' },
+    frameNumbers: { enabled: true, positions: ['bottom-left', 'bottom-center'] },
+    markers: { enabled: true, positions: ['bottom-right'] },
+    filmLayout: {
+      geometry: { rebates: { topRatio: 0.154, rightRatio: 0.027, bottomRatio: 0.154, leftRatio: 0.027 } },
+      sizePresets: {
+        compact: { topScale: 0.78, rightScale: 0.82, bottomScale: 0.78, leftScale: 0.82 },
+        standard: { topScale: 1, rightScale: 1, bottomScale: 1, leftScale: 1 }
+      },
+      perforations: { enabled: true, count: 8, widthRatio: 0.055, heightRatio: 0.077, cornerRadiusRatio: 0.018 },
+      edgeLabel: true,
+      frameNumber: true,
+      markers: true
+    }
   },
   {
-    id: 'medium-format-120', name: '120 中画幅', renderer: FRAME_RENDERER_TYPES.MEDIUM_FORMAT_REBATE,
+    id: 'film-rebate-minimal', name: '极简胶片边码', category: 'film-rebate',
+    renderer: FRAME_RENDERER_TYPES.FILM_REBATE_LAYOUT, layoutModel: 'film-rebate',
+    color: '#030303', supportsColor: false, supportsStrength: false,
+    supportsFrameSize: true, supportsPerforations: false, supportsEdgeLabel: true,
+    supportsFrameNumber: true, supportsMarkers: true,
+    previewAsset: '/assets/frame-previews/film-rebate-minimal.png',
+    supportedRatios: ['1:1', '2:3', '3:4', '4:5', '9:16', '16:9'],
+    geometry: {
+      frameAspectPolicy: 'derived-from-aperture',
+      rebates: { topRatio: 0.033, rightRatio: 0.032, bottomRatio: 0.032, leftRatio: 0.032 }
+    },
+    perforations: { enabled: false, sides: [], shape: 'none', count: 0, widthRatio: 0, heightRatio: 0, cornerRadiusRatio: 0 },
+    labels: { enabled: true, position: 'top-left', textPreset: 'BATCHFRAME COLOR 400' },
+    frameNumbers: { enabled: true, positions: ['top-right', 'bottom-center'] },
+    markers: { enabled: true, positions: ['bottom-left', 'bottom-right'] },
+    filmLayout: {
+      geometry: { rebates: { topRatio: 0.033, rightRatio: 0.032, bottomRatio: 0.032, leftRatio: 0.032 } },
+      sizePresets: {
+        compact: { topScale: 0.82, rightScale: 0.82, bottomScale: 0.82, leftScale: 0.82 },
+        standard: { topScale: 1, rightScale: 1, bottomScale: 1, leftScale: 1 }
+      },
+      perforations: { enabled: false, count: 0, widthRatio: 0, heightRatio: 0, cornerRadiusRatio: 0 },
+      edgeLabel: true,
+      frameNumber: true,
+      markers: true
+    }
+  },
+  {
+    id: 'medium-format-120', name: '120 中画幅', category: 'film-rebate-legacy', renderer: FRAME_RENDERER_TYPES.MEDIUM_FORMAT_REBATE,
     color: '#030303', widthAt1800: 64, supportsStrength: false, supportsColor: false,
     variants: 3, previewAsset: '/assets/frame-previews/medium-format-120.png',
     supportedRatios: ['1:1', '3:4', '4:5']
@@ -82,7 +133,8 @@ const EDGE_STRENGTHS = Object.freeze([
 
 const LEGACY_STYLE_IDS = Object.freeze({
   'darkroom-scan': 'full-frame-scan',
-  'rough-emulsion': 'emulsion-damage'
+  'rough-emulsion': 'emulsion-damage',
+  'negative-35mm': 'film-strip-35mm-full'
 });
 
 function migrateInnerFrameStyleId(id) {

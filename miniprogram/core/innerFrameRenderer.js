@@ -360,6 +360,88 @@ function drawMediumFormatFrame({ ctx, image, photoRect, frameWidth, color, seed,
   return { ...paths, mediumFormat: true };
 }
 
+function drawFilmText(ctx, text, box, color, orientation, rotateForPortrait = false) {
+  if (!text || typeof ctx.fillText !== 'function') return;
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.font = `${Math.max(8, Math.round(Math.min(box.width, box.height) * 0.9))}px sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  if (orientation === 'portrait' && rotateForPortrait && typeof ctx.translate === 'function' && typeof ctx.rotate === 'function') {
+    ctx.translate(box.x + box.width / 2, box.y + box.height / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(text, -box.height / 2, 0);
+  } else {
+    ctx.fillText(text, box.x, box.y + box.height / 2);
+  }
+  ctx.restore();
+}
+
+function traceLayoutRectPath(ctx, rectangle) {
+  ctx.beginPath();
+  if (typeof ctx.rect === 'function') {
+    ctx.rect(rectangle.x, rectangle.y, rectangle.width, rectangle.height);
+  } else {
+    ctx.moveTo(rectangle.x, rectangle.y);
+    ctx.lineTo(rectangle.x + rectangle.width, rectangle.y);
+    ctx.lineTo(rectangle.x + rectangle.width, rectangle.y + rectangle.height);
+    ctx.lineTo(rectangle.x, rectangle.y + rectangle.height);
+    ctx.closePath();
+  }
+}
+
+function drawFilmMarker(ctx, marker, color) {
+  if (!marker) return;
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(marker.x, marker.y + marker.height);
+  ctx.lineTo(marker.x + marker.width, marker.y + marker.height / 2);
+  ctx.lineTo(marker.x, marker.y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawFilmRebateLayoutFrame({ ctx, image, layout, style, color, backgroundColor, framePerforationsEnabled = true, frameEdgeLabelEnabled = true, frameNumberEnabled = true, frameMarkersEnabled = true, frameIndex = 1 }) {
+  if (!layout || !layout.frameRect || !layout.apertureRect) return null;
+  const frame = layout.frameRect;
+  const aperture = layout.apertureRect;
+  const decoration = layout.decorationRects || {};
+  const accent = '#F3A126';
+  ctx.save();
+  ctx.fillStyle = color || style.color || '#030303';
+  ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
+  ctx.restore();
+
+  // The aperture is always a hard rectangle. Structured rebates must never
+  // reuse the smooth irregular path used by material-like borders.
+  ctx.save();
+  traceLayoutRectPath(ctx, aperture);
+  ctx.clip();
+  ctx.drawImage(image, aperture.x, aperture.y, aperture.width, aperture.height);
+  ctx.restore();
+
+  if (style.supportsPerforations && framePerforationsEnabled) {
+    decoration.perforations.forEach(perforation => drawCutout(ctx, perforation.x, perforation.y, perforation.width, perforation.height, backgroundColor));
+  }
+  if (style.supportsEdgeLabel && frameEdgeLabelEnabled) {
+    const label = style.id === 'film-strip-35mm-full' ? 'BATCHFRAME COLOR 400' : 'BATCHFRAME  ·  07';
+    drawFilmText(ctx, label, decoration.labels[0], accent, layout.orientation, style.id === 'film-strip-35mm-full');
+  }
+  if (style.supportsFrameNumber && frameNumberEnabled) {
+    decoration.frameNumbers.forEach((box, index) => drawFilmText(ctx, index === 0 ? String(frameIndex).padStart(2, '0') : `${frameIndex}A`, box, accent, layout.orientation, style.id === 'film-strip-35mm-full'));
+  }
+  if (style.supportsMarkers && frameMarkersEnabled) decoration.markers.forEach(marker => drawFilmMarker(ctx, marker, accent));
+  return {
+    frameRect: frame,
+    apertureRect: aperture,
+    decorationRects: decoration,
+    orientation: layout.orientation,
+    frameSizePreset: layout.frameSizePreset
+  };
+}
+
 function drawFragments(ctx, paths, seed, color, density, sizeScale = 1) {
   const random = createSeededRandom(`${seed}:fragments`);
   const count = Math.max(0, Math.round(density * 72));
@@ -393,7 +475,8 @@ const FRAME_RENDERERS = Object.freeze({
   [FRAME_RENDERER_TYPES.FILM_GATE]: drawFilmGateFrame,
   [FRAME_RENDERER_TYPES.PERFORATED_FILM]: drawPerforatedFilmFrame,
   [FRAME_RENDERER_TYPES.MEDIUM_FORMAT_REBATE]: drawMediumFormatFrame,
-  [FRAME_RENDERER_TYPES.EMULSION_MASK]: drawEmulsionDamageFrame
+  [FRAME_RENDERER_TYPES.EMULSION_MASK]: drawEmulsionDamageFrame,
+  [FRAME_RENDERER_TYPES.FILM_REBATE_LAYOUT]: drawFilmRebateLayoutFrame
 });
 
 function drawImageWithInnerFrame(options) {
@@ -422,5 +505,6 @@ module.exports = {
   drawFilmGateFrame,
   drawPerforatedFilmFrame,
   drawMediumFormatFrame,
-  drawEmulsionDamageFrame
+  drawEmulsionDamageFrame,
+  drawFilmRebateLayoutFrame
 };
