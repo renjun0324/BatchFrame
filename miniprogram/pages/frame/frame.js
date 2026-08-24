@@ -851,7 +851,7 @@ Page({
     this.setData({ borderPx: px }, this.redrawPreview);
   },
   applyImageZoom(v, showBadge){
-    const pct = Math.max(100, Math.min(200, parseInt(v, 10) || 100));
+    const pct = Math.max(50, Math.min(200, parseInt(v, 10) || 100));
     const imageZoom = pct / 100;
     const index = this.data.curIndex;
     const images = (this.data.images || []).map((item, itemIndex) =>

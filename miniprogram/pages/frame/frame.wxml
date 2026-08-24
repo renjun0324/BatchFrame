@@ -1,7 +1,7 @@
 <view class="workspace">
   <view class="top-bar">
-    <view class="top-title">
-      <text class="app-name">{{images.length?'照片序列':'装裱编辑器'}}</text>
+    <view class="top-title" wx:if="{{images.length}}">
+      <text class="app-name">已选照片</text>
       <text class="selection-count" wx:if="{{images.length}}">{{images.length}} 张</text>
     </view>
     <button class="btn primary compact-btn" bindtap="chooseImages">{{images.length?'添加照片':'选择照片'}}</button>
@@ -47,7 +47,7 @@
   <view class="setting-sheet {{panelExpanded?'expanded':'collapsed'}}">
     <scroll-view class="setting-scroll" scroll-y scroll-top="{{panelScrollTop}}">
       <view wx:if="{{activeTool==='template'}}" class="tool-panel">
-        <view class="panel-heading">组合模板</view>
+        <view class="panel-heading">模板</view>
         <scroll-view class="template-list" scroll-x>
           <view wx:for="{{templates}}" wx:key="id"
                 class="template-card {{innerFrameStyleId===item.styleId && outerBgColor===item.outerBgColor?'active':''}}"
@@ -59,7 +59,6 @@
             <text>{{item.name}}</text>
           </view>
         </scroll-view>
-        <view class="panel-hint">模板会同时设置外层背景和内层风格，不改变照片颜色。</view>
       </view>
 
       <view wx:if="{{activeTool==='canvas'}}" class="tool-panel">
@@ -94,11 +93,11 @@
             <text>图片缩放</text>
             <text class="setting-value">{{imageZoomPct}}%</text>
           </view>
-          <slider min="100" max="200" step="1" value="{{imageZoomPct}}"
+          <slider min="50" max="200" step="1" value="{{imageZoomPct}}"
                   bindchanging="onImageZoomChanging" bindchange="onImageZoomChange"
                   activeColor="#9E4F2B" backgroundColor="#D8D0C3" block-color="#9E4F2B"/>
           <view class="adjustment-footer">
-            <text class="panel-hint">放大照片以调整片基窗口内的构图</text>
+            <text class="panel-hint">缩小或放大当前照片</text>
             <button class="text-action" bindtap="resetCurrentImageZoom">恢复</button>
           </view>
         </view>

@@ -135,6 +135,12 @@ function testImageZoomStaysInsideAperture() {
   assert.strictEqual(base.apertureRect.width, enlarged.apertureRect.width, 'image zoom must not resize the aperture');
   assert(enlarged.imageDrawRect.width > base.imageDrawRect.width * 1.45);
   assert(enlarged.imageDrawRect.height > base.imageDrawRect.height * 1.45);
+  const reduced = renderComposite({
+    ...common,
+    innerFrameSettings: { ...common.innerFrameSettings, imageZoom: 0.5 }
+  });
+  assert(reduced.imageDrawRect.width < base.imageDrawRect.width * 0.55);
+  assert(reduced.imageDrawRect.height < base.imageDrawRect.height * 0.55);
 }
 
 test35mmRatios();

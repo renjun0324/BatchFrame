@@ -61,7 +61,7 @@ function calculateApertureImageRect({ apertureRect, imageWidth, imageHeight, zoo
   const sourceWidth = Math.max(1, Number(imageWidth) || 1);
   const sourceHeight = Math.max(1, Number(imageHeight) || 1);
   const baseScale = Math.max(width / sourceWidth, height / sourceHeight);
-  const scale = baseScale * clamp(Number(zoom) || 1, 1, 2);
+  const scale = baseScale * clamp(Number(zoom) || 1, 0.5, 2);
   const drawWidth = sourceWidth * scale;
   const drawHeight = sourceHeight * scale;
   return {

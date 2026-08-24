@@ -12,6 +12,7 @@ assert(wxml.includes("activeTool==='frame'"));
 assert(!wxml.includes("activeTool==='image'"), 'image controls must live in the picture panel');
 assert(wxml.includes('图片缩放'));
 assert(wxml.includes('onImageZoomChanging'));
+assert(wxml.includes('min="50" max="200"'), 'image scaling must support zooming out and in');
 assert(!wxml.includes('完整显示'), 'non-interactive fit copy should not be shown');
 assert(wxml.includes('displayWidth') && wxml.includes('displayHeight'));
 assert(wxml.includes('class="setting-scroll"'));
