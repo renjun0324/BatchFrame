@@ -49,7 +49,7 @@ function testDeterminism() {
 }
 
 function testStyleRegistry() {
-  const expected = ['none', 'clean-black', 'full-frame-scan', 'scan-emulsion-edge', 'film-gate', 'film-strip-35mm-full', 'film-rebate-minimal', 'medium-format-120', 'emulsion-damage'];
+  const expected = ['none', 'clean-black', 'full-frame-scan', 'scan-emulsion-edge', 'film-gate', 'film-strip-35mm-full', 'film-rebate-minimal', 'film-35mm-mono', 'film-35mm-warm', 'film-120-classic', 'film-16mm-cinema', 'film-110-pocket', 'film-contact-sheet', 'medium-format-120', 'emulsion-damage'];
   assert.deepStrictEqual(INNER_FRAME_STYLES.map(style => style.id), expected);
   INNER_FRAME_STYLES.forEach(style => {
     assert(FRAME_RENDERERS[style.renderer], `${style.id} must have a renderer`);
@@ -57,6 +57,9 @@ function testStyleRegistry() {
     const previewPath = path.join(__dirname, '..', 'miniprogram', style.previewAsset.replace(/^\//, ''));
     assert(fs.existsSync(previewPath), `${style.id} selector preview must exist`);
     assert(fs.statSync(previewPath).size > 0, `${style.id} selector preview must be non-empty`);
+    if (style.id.indexOf('film-') === 0 && style.id !== 'film-gate') {
+      assert(fs.statSync(previewPath).size <= 15 * 1024, `${style.id} selector preview must stay within the runtime budget`);
+    }
     if (style.id === 'film-gate') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.FILM_GATE);
     if (style.id === 'scan-emulsion-edge') {
       assert.strictEqual(style.category, 'basic-frame');
@@ -202,7 +205,7 @@ function testDedicatedRenderers() {
     'top-left': {}, top: {}, 'top-right': {}, right: {},
     'bottom-right': {}, bottom: {}, 'bottom-left': {}, left: {}
   };
-  ['film-gate', 'film-strip-35mm-full', 'film-rebate-minimal', 'medium-format-120', 'emulsion-damage', 'scan-emulsion-edge'].forEach(styleId => {
+  ['film-gate', 'film-strip-35mm-full', 'film-rebate-minimal', 'film-35mm-mono', 'film-35mm-warm', 'film-120-classic', 'film-16mm-cinema', 'film-110-pocket', 'film-contact-sheet', 'medium-format-120', 'emulsion-damage', 'scan-emulsion-edge'].forEach(styleId => {
     const result = renderComposite({
       ctx, outWidth: 1800, outHeight: 1200, image, imageId: styleId,
       imageSeed: 'stable-seed',

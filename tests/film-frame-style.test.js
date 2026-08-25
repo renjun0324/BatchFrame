@@ -38,7 +38,7 @@ function testLegacyNormalization() {
 }
 
 function testProductionCanonicalDefinitions() {
-  ['film-strip-35mm-full', 'film-rebate-minimal'].forEach(id => {
+  ['film-strip-35mm-full', 'film-rebate-minimal', 'film-35mm-mono', 'film-35mm-warm', 'film-120-classic', 'film-16mm-cinema', 'film-110-pocket', 'film-contact-sheet'].forEach(id => {
     const style = getInnerFrameStyle(id);
     const canonical = normalizeFilmFrameStyle(style);
     assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.FILM_FRAME);

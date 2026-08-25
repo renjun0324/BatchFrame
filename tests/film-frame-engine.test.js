@@ -4,6 +4,7 @@ const path = require('path');
 const { getInnerFrameStyle } = require('../miniprogram/core/innerFrameStyles');
 const { layoutInnerFrame } = require('../miniprogram/core/innerFrameLayout');
 const {
+  FRAME_RENDERERS,
   drawFilmFrame,
   drawFilmMarker,
   drawTextureOverlay,
@@ -37,10 +38,14 @@ function testGenericRendererHasNoStyleBranch() {
   const generic = source.slice(source.indexOf('function drawFilmFrame'), source.indexOf('function drawFragments'));
   assert(!generic.includes('film-strip-35mm-full'));
   assert(!generic.includes('film-rebate-minimal'));
+  ['film-35mm-mono', 'film-35mm-warm', 'film-120-classic', 'film-16mm-cinema', 'film-110-pocket', 'film-contact-sheet'].forEach(id => {
+    assert(!generic.includes(id), `${id} must not create a renderer branch`);
+  });
+  assert.strictEqual(FRAME_RENDERERS['film-frame'], drawFilmFrame);
 }
 
 function testRectAperturesDoNotCurve() {
-  ['film-strip-35mm-full', 'film-rebate-minimal'].forEach(styleId => {
+  ['film-strip-35mm-full', 'film-rebate-minimal', 'film-35mm-mono', 'film-35mm-warm', 'film-120-classic', 'film-16mm-cinema', 'film-110-pocket', 'film-contact-sheet'].forEach(styleId => {
     const { ctx, calls } = recordingContext();
     drawFilmFrame({
       ctx,
@@ -54,6 +59,36 @@ function testRectAperturesDoNotCurve() {
     assert(!calls.slice(0, apertureClip + 1).some(call => call.key === 'quadraticCurveTo'), `${styleId} aperture must remain rectangular`);
     assert(calls.some(call => call.key === 'drawImage'));
   });
+}
+
+function testFirstBatchDefinitionsAndStructures() {
+  const expected = {
+    'film-35mm-mono': { holes: 16, sides: ['top', 'bottom'], frame: '#050505', accent: '#D8D8D2' },
+    'film-35mm-warm': { holes: 16, sides: ['top', 'bottom'], frame: '#130D09', accent: '#D98235' },
+    'film-120-classic': { holes: 0, sides: [], frame: '#040404', accent: '#DDD8CC' },
+    'film-16mm-cinema': { holes: 26, sides: ['top', 'bottom'], frame: '#050505', accent: '#E4B45E' },
+    'film-110-pocket': { holes: 8, sides: ['bottom'], frame: '#080706', accent: '#E1D7C5' },
+    'film-contact-sheet': { holes: 0, sides: [], frame: '#090909', accent: '#E7E0D2' }
+  };
+  Object.entries(expected).forEach(([styleId, expectation]) => {
+    const style = getInnerFrameStyle(styleId);
+    assert.strictEqual(style.renderer, 'film-frame');
+    assert.strictEqual(style.layoutModel, 'film-frame');
+    assert.strictEqual(style.category, 'film-rebate');
+    assert.strictEqual(style.material.textureOverlay, null);
+    assert.strictEqual(style.frame.color, expectation.frame);
+    const landscape = filmLayout(styleId, 'landscape');
+    const portrait = filmLayout(styleId, 'portrait');
+    assert.strictEqual(landscape.decorationRects.perforations.length, expectation.holes);
+    assert.strictEqual(portrait.decorationRects.perforations.length, expectation.holes);
+    assert.deepStrictEqual([...new Set(landscape.decorationRects.perforations.map(item => item.side))], expectation.sides);
+    const rotated = expectation.sides.map(side => ({ top: 'right', right: 'bottom', bottom: 'left', left: 'top' }[side]));
+    assert.deepStrictEqual([...new Set(portrait.decorationRects.perforations.map(item => item.side))], rotated);
+    assert(landscape.decorationRects.labels.concat(landscape.decorationRects.frameNumbers, landscape.decorationRects.markers)
+      .some(item => item.color === expectation.accent));
+    assert(landscape.apertureRect.width > 0 && landscape.apertureRect.height > 0);
+  });
+  assert(getInnerFrameStyle('medium-format-120'), 'legacy 120 must remain registered');
 }
 
 function testMarkerPrimitives() {
@@ -103,6 +138,7 @@ function testPreviewExportProportions() {
 testGenericRendererHasNoStyleBranch();
 testRectAperturesDoNotCurve();
 testMarkerPrimitives();
+testFirstBatchDefinitionsAndStructures();
 testTextureLayer();
 testPreviewExportProportions();
 console.log('film frame engine tests passed');

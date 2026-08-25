@@ -129,6 +129,190 @@ const INNER_FRAME_STYLES = Object.freeze([
     material: { textureOverlay: null }
   },
   {
+    id: 'film-35mm-mono', name: '35mm 黑白片基', category: 'film-rebate',
+    renderer: FRAME_RENDERER_TYPES.FILM_FRAME, layoutModel: 'film-frame',
+    color: '#050505', supportsColor: false, supportsStrength: false,
+    supportsFrameSize: true, supportsPerforations: true, supportsEdgeLabel: true,
+    supportsFrameNumber: true, supportsMarkers: true,
+    previewAsset: '/assets/frame-previews/film-35mm-mono.png',
+    supportedRatios: ['1:1', '2:3', '3:4', '4:5', '16:9'],
+    frame: {
+      color: '#050505',
+      sizePresets: {
+        compact: { top: 0.8, right: 0.84, bottom: 0.8, left: 0.84 },
+        standard: { top: 1, right: 1, bottom: 1, left: 1 }
+      }
+    },
+    geometry: {
+      rebates: { top: 0.145, right: 0.028, bottom: 0.145, left: 0.028 },
+      orientationPolicy: 'rotate-film-layout',
+      aperture: { shape: 'rect', cornerRadiusRatio: 0 }
+    },
+    perforations: { enabled: true, sides: ['top', 'bottom'], count: 8, shape: 'rounded-rect', widthRatio: 0.052, heightRatio: 0.073, cornerRadiusRatio: 0.018, gapPolicy: 'even', color: 'outer-background' },
+    decorations: {
+      labels: [{ enabled: true, text: 'BF MONO 400', color: '#D8D8D2', anchor: 'top-start', sizeRatio: 0.035, spanRatio: 0.28, portraitRotation: 'counter-clockwise' }],
+      frameNumbers: [{ enabled: true, value: 'sequence-2-digit', color: '#D8D8D2', anchor: 'bottom-start', sizeRatio: 0.04, spanRatio: 0.12 }],
+      markers: [{ enabled: true, type: 'square', color: '#D8D8D2', anchor: 'bottom-end', sizeRatio: 0.025, spanRatio: 0.04 }]
+    },
+    material: { textureOverlay: null }
+  },
+  {
+    id: 'film-35mm-warm', name: '35mm 暖调片基', category: 'film-rebate',
+    renderer: FRAME_RENDERER_TYPES.FILM_FRAME, layoutModel: 'film-frame',
+    color: '#130D09', supportsColor: false, supportsStrength: false,
+    supportsFrameSize: true, supportsPerforations: true, supportsEdgeLabel: true,
+    supportsFrameNumber: true, supportsMarkers: true,
+    previewAsset: '/assets/frame-previews/film-35mm-warm.png',
+    supportedRatios: ['1:1', '2:3', '3:4', '4:5', '16:9'],
+    frame: {
+      color: '#130D09',
+      sizePresets: {
+        compact: { top: 0.8, right: 0.84, bottom: 0.8, left: 0.84 },
+        standard: { top: 1, right: 1, bottom: 1, left: 1 }
+      }
+    },
+    geometry: {
+      rebates: { top: 0.15, right: 0.028, bottom: 0.15, left: 0.028 },
+      orientationPolicy: 'rotate-film-layout',
+      aperture: { shape: 'rect', cornerRadiusRatio: 0 }
+    },
+    perforations: { enabled: true, sides: ['top', 'bottom'], count: 8, shape: 'rounded-rect', widthRatio: 0.055, heightRatio: 0.077, cornerRadiusRatio: 0.018, gapPolicy: 'even', color: 'outer-background' },
+    decorations: {
+      labels: [{ enabled: true, text: 'BF COLOR 200', color: '#D98235', anchor: 'top-start', sizeRatio: 0.035, spanRatio: 0.3, portraitRotation: 'counter-clockwise' }],
+      frameNumbers: [
+        { enabled: true, value: 'sequence-2-digit', color: '#D98235', anchor: 'bottom-start', sizeRatio: 0.04, spanRatio: 0.12 },
+        { enabled: true, value: 'sequence-alpha', color: '#D98235', anchor: 'bottom-center', sizeRatio: 0.04, spanRatio: 0.08 }
+      ],
+      markers: [{ enabled: true, type: 'arrow', color: '#D98235', anchor: 'bottom-end', sizeRatio: 0.028, spanRatio: 0.05 }]
+    },
+    material: { textureOverlay: null }
+  },
+  {
+    id: 'film-120-classic', name: '120 经典片基', category: 'film-rebate',
+    renderer: FRAME_RENDERER_TYPES.FILM_FRAME, layoutModel: 'film-frame',
+    color: '#040404', supportsColor: false, supportsStrength: false,
+    supportsFrameSize: true, supportsPerforations: false, supportsEdgeLabel: true,
+    supportsFrameNumber: true, supportsMarkers: true,
+    previewAsset: '/assets/frame-previews/film-120-classic.png',
+    supportedRatios: ['1:1', '2:3', '3:4', '4:5', '9:16', '16:9'],
+    frame: {
+      color: '#040404',
+      sizePresets: {
+        compact: { top: 0.8, right: 0.82, bottom: 0.8, left: 0.82 },
+        standard: { top: 1, right: 1, bottom: 1, left: 1 }
+      }
+    },
+    geometry: {
+      rebates: { top: 0.065, right: 0.055, bottom: 0.08, left: 0.055 },
+      orientationPolicy: 'rotate-film-layout',
+      aperture: { shape: 'rect', cornerRadiusRatio: 0 }
+    },
+    perforations: { enabled: false, sides: [], count: 0, shape: 'rect', widthRatio: 0.01, heightRatio: 0.01, cornerRadiusRatio: 0, gapPolicy: 'even', color: 'outer-background' },
+    decorations: {
+      labels: [{ enabled: true, text: 'BF 120  ·  FRAME', color: '#DDD8CC', anchor: 'top-start', sizeRatio: 0.032, spanRatio: 0.36 }],
+      frameNumbers: [{ enabled: true, value: 'sequence-2-digit', color: '#DDD8CC', anchor: 'bottom-end', sizeRatio: 0.04, spanRatio: 0.12 }],
+      markers: [{ enabled: true, type: 'circle', color: '#DDD8CC', anchor: 'bottom-start', sizeRatio: 0.026, spanRatio: 0.04 }]
+    },
+    material: { textureOverlay: null }
+  },
+  {
+    id: 'film-16mm-cinema', name: '16mm 电影片基', category: 'film-rebate',
+    renderer: FRAME_RENDERER_TYPES.FILM_FRAME, layoutModel: 'film-frame',
+    color: '#050505', supportsColor: false, supportsStrength: false,
+    supportsFrameSize: true, supportsPerforations: true, supportsEdgeLabel: true,
+    supportsFrameNumber: true, supportsMarkers: true,
+    previewAsset: '/assets/frame-previews/film-16mm-cinema.png',
+    supportedRatios: ['1:1', '2:3', '3:4', '4:5', '16:9'],
+    frame: {
+      color: '#050505',
+      sizePresets: {
+        compact: { top: 0.8, right: 0.86, bottom: 0.8, left: 0.86 },
+        standard: { top: 1, right: 1, bottom: 1, left: 1 }
+      }
+    },
+    geometry: {
+      rebates: { top: 0.105, right: 0.024, bottom: 0.105, left: 0.024 },
+      orientationPolicy: 'rotate-film-layout',
+      aperture: { shape: 'rect', cornerRadiusRatio: 0 }
+    },
+    perforations: { enabled: true, sides: ['top', 'bottom'], count: 13, shape: 'rounded-rect', widthRatio: 0.027, heightRatio: 0.048, cornerRadiusRatio: 0.014, gapPolicy: 'even', color: 'outer-background' },
+    decorations: {
+      labels: [{ enabled: true, text: 'BF CINEMA 16', color: '#E4B45E', anchor: 'top-start', sizeRatio: 0.03, spanRatio: 0.3, portraitRotation: 'counter-clockwise' }],
+      frameNumbers: [{ enabled: true, value: 'sequence-2-digit', color: '#E4B45E', anchor: 'bottom-center', sizeRatio: 0.035, spanRatio: 0.1 }],
+      markers: [
+        { enabled: true, type: 'square', color: '#E4B45E', anchor: 'bottom-start', sizeRatio: 0.02, spanRatio: 0.035 },
+        { enabled: true, type: 'arrow', color: '#E4B45E', anchor: 'bottom-end', sizeRatio: 0.024, spanRatio: 0.05 }
+      ]
+    },
+    material: { textureOverlay: null }
+  },
+  {
+    id: 'film-110-pocket', name: '110 袖珍胶片', category: 'film-rebate',
+    renderer: FRAME_RENDERER_TYPES.FILM_FRAME, layoutModel: 'film-frame',
+    color: '#080706', supportsColor: false, supportsStrength: false,
+    supportsFrameSize: true, supportsPerforations: true, supportsEdgeLabel: true,
+    supportsFrameNumber: true, supportsMarkers: true,
+    previewAsset: '/assets/frame-previews/film-110-pocket.png',
+    supportedRatios: ['1:1', '2:3', '3:4', '4:5', '9:16', '16:9'],
+    frame: {
+      color: '#080706',
+      sizePresets: {
+        compact: { top: 0.8, right: 0.82, bottom: 0.8, left: 0.82 },
+        standard: { top: 1, right: 1, bottom: 1, left: 1 }
+      }
+    },
+    geometry: {
+      rebates: { top: 0.07, right: 0.025, bottom: 0.11, left: 0.025 },
+      orientationPolicy: 'rotate-film-layout',
+      aperture: { shape: 'rect', cornerRadiusRatio: 0 }
+    },
+    perforations: { enabled: true, sides: ['bottom'], count: 8, shape: 'rounded-rect', widthRatio: 0.032, heightRatio: 0.045, cornerRadiusRatio: 0.012, gapPolicy: 'even', color: 'outer-background' },
+    decorations: {
+      labels: [{ enabled: true, text: 'BF 110', color: '#E1D7C5', anchor: 'top-start', sizeRatio: 0.03, spanRatio: 0.2, portraitRotation: 'counter-clockwise' }],
+      frameNumbers: [{ enabled: true, value: 'sequence', color: '#E1D7C5', anchor: 'bottom-end', sizeRatio: 0.038, spanRatio: 0.08 }],
+      markers: [{ enabled: true, type: 'square', color: '#E1D7C5', anchor: 'bottom-start', sizeRatio: 0.022, spanRatio: 0.04 }]
+    },
+    material: { textureOverlay: null }
+  },
+  {
+    id: 'film-contact-sheet', name: '接触印样', category: 'film-rebate',
+    renderer: FRAME_RENDERER_TYPES.FILM_FRAME, layoutModel: 'film-frame',
+    color: '#090909', supportsColor: false, supportsStrength: false,
+    supportsFrameSize: true, supportsPerforations: false, supportsEdgeLabel: true,
+    supportsFrameNumber: true, supportsMarkers: true,
+    previewAsset: '/assets/frame-previews/film-contact-sheet.png',
+    supportedRatios: ['1:1', '2:3', '3:4', '4:5', '9:16', '16:9'],
+    frame: {
+      color: '#090909',
+      sizePresets: {
+        compact: { top: 0.82, right: 0.82, bottom: 0.82, left: 0.82 },
+        standard: { top: 1, right: 1, bottom: 1, left: 1 }
+      }
+    },
+    geometry: {
+      rebates: { top: 0.07, right: 0.045, bottom: 0.095, left: 0.045 },
+      orientationPolicy: 'rotate-film-layout',
+      aperture: { shape: 'rect', cornerRadiusRatio: 0 }
+    },
+    perforations: { enabled: false, sides: [], count: 0, shape: 'rect', widthRatio: 0.01, heightRatio: 0.01, cornerRadiusRatio: 0, gapPolicy: 'even', color: 'outer-background' },
+    decorations: {
+      labels: [
+        { enabled: true, text: 'BF CONTACT', color: '#E7E0D2', anchor: 'top-start', sizeRatio: 0.03, spanRatio: 0.26 },
+        { enabled: true, text: 'ARCHIVE', color: '#A9A49A', anchor: 'top-end', sizeRatio: 0.026, spanRatio: 0.18 }
+      ],
+      frameNumbers: [
+        { enabled: true, value: 'sequence-2-digit', color: '#E7E0D2', anchor: 'bottom-start', sizeRatio: 0.037, spanRatio: 0.1 },
+        { enabled: true, value: 'sequence-alpha', color: '#A9A49A', anchor: 'bottom-center', sizeRatio: 0.032, spanRatio: 0.08 }
+      ],
+      markers: [
+        { enabled: true, type: 'line', color: '#E7E0D2', anchor: 'bottom-end', sizeRatio: 0.02, spanRatio: 0.06 },
+        { enabled: true, type: 'square', color: '#E7E0D2', anchor: 'corner-bottom-right', sizeRatio: 0.018, spanRatio: 0.04 },
+        { enabled: true, type: 'line', color: '#A9A49A', anchor: 'corner-top-left', sizeRatio: 0.018, spanRatio: 0.04 }
+      ]
+    },
+    material: { textureOverlay: null }
+  },
+  {
     id: 'medium-format-120', name: '120 中画幅', category: 'film-rebate-legacy', renderer: FRAME_RENDERER_TYPES.MEDIUM_FORMAT_REBATE,
     color: '#030303', widthAt1800: 64, supportsStrength: false, supportsColor: false,
     variants: 3, previewAsset: '/assets/frame-previews/medium-format-120.png',
