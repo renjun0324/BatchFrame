@@ -10,10 +10,10 @@ import hashlib
 import random
 
 from PIL import Image, ImageDraw, ImageOps
+from selector_preview_scene import photo_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PHOTO = ROOT / "docs" / "readme-assets" / "example.jpg"
 OUT = ROOT / "miniprogram" / "assets" / "frame-previews"
 SIZE = (240, 150)
 
@@ -23,10 +23,7 @@ def rng(style):
 
 
 def sample():
-    source = Image.open(PHOTO).convert("RGB")
-    if source.width > 2 * source.height:
-        source = source.crop((source.width // 4, 0, source.width * 3 // 4, source.height))
-    return ImageOps.fit(source, (132, 94), method=Image.Resampling.LANCZOS)
+    return ImageOps.fit(photo_source(), (132, 94), method=Image.Resampling.LANCZOS)
 
 
 def polygon_frame(draw, photo_box, width, wobble, random):

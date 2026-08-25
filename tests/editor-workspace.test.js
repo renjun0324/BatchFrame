@@ -18,6 +18,8 @@ assert(wxml.includes('displayWidth') && wxml.includes('displayHeight'));
 assert(wxml.includes('class="setting-scroll"'));
 assert(wxml.includes('basic-frame-card'), 'basic frame cards should have their own compact treatment');
 assert(wxml.includes('frame-card-preview') && wxml.includes('item.previewAsset'), 'frame selector must render the style-owned production preview asset');
+assert(wxml.includes('template-card-preview') && wxml.includes('src="{{item.previewAsset}}"'), 'template cards must use the same style-owned artwork as frame cards');
+assert(!wxml.includes('template-photo') && !wxml.includes('template-edge'), 'template cards must not fall back to CSS mock artwork');
 assert(wxss.includes('.workspace') && wxss.includes('overflow: hidden'));
 assert(wxss.includes('.preview-stage') && wxss.includes('.setting-sheet'));
 assert(wxss.includes('--bf-accent') && wxss.includes('--bf-page'), 'gallery palette tokens must be defined');

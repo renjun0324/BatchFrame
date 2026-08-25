@@ -52,9 +52,8 @@
           <view wx:for="{{templates}}" wx:key="id"
                 class="template-card {{innerFrameStyleId===item.styleId && outerBgColor===item.outerBgColor?'active':''}}"
                 data-template-id="{{item.id}}" bindtap="onTemplateTap">
-            <view class="template-preview {{item.outerBgColor==='#000000'?'dark':''}}">
-              <view class="template-photo"></view>
-              <view class="template-edge"></view>
+            <view class="template-preview" style="background: {{item.outerBgColor}};">
+              <image class="template-card-preview" src="{{item.previewAsset}}" mode="aspectFill"/>
             </view>
             <text>{{item.name}}</text>
           </view>

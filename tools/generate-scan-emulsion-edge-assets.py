@@ -16,13 +16,13 @@ import subprocess
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
+from selector_preview_scene import photo_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
 MASK_ROOT = ROOT / 'miniprogram' / 'assets' / 'frame-masks' / 'scan-emulsion-edge'
 PREVIEW = ROOT / 'miniprogram' / 'assets' / 'frame-previews' / 'scan-emulsion-edge.png'
 REVIEW = ROOT / 'docs' / 'production-frame-review'
-PHOTO = ROOT / 'docs' / 'readme-assets' / 'example.jpg'
 SEGMENTS = ('top-left', 'top', 'top-right', 'right', 'bottom-right', 'bottom', 'bottom-left', 'left')
 WARM = ((216, 190, 120, 184), (228, 208, 154, 158), (185, 149, 76, 184), (238, 227, 197, 132))
 BLACK = (5, 5, 5, 145)
@@ -146,8 +146,7 @@ def write_masks() -> None:
 
 
 def photo(size: tuple[int, int]) -> Image.Image:
-    source = Image.open(PHOTO).convert('RGB')
-    return ImageOps.fit(source, size, method=Image.Resampling.LANCZOS)
+    return ImageOps.fit(photo_source(), size, method=Image.Resampling.LANCZOS)
 
 
 def actual_scan_plan(photo_box: tuple[int, int, int, int], border: int, variant: int) -> dict:

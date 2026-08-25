@@ -148,11 +148,9 @@ page {
 .template-card.active .template-preview { border-color: var(--bf-accent); box-shadow: inset 0 0 0 1px var(--bf-accent); }
 .frame-style-card.active .frame-card-sample { border-color: var(--bf-accent); box-shadow: inset 0 0 0 1px var(--bf-accent); }
 .frame-card-preview { display: block; width: 100%; height: 100%; }
-.template-preview { position: relative; height: 48px; overflow: hidden; border: 1px solid var(--bf-line); background: #eee9df; box-sizing: border-box; }
+.template-preview { position: relative; height: 48px; overflow: hidden; border: 1px solid var(--bf-line); box-sizing: border-box; }
 .frame-card-sample, .basic-frame-card .frame-card-sample { position: relative; height: 48px; overflow: hidden; border: 1px solid var(--bf-line); background: #eee9df; box-sizing: border-box; }
-.template-preview.dark { background: #20201d; }
-.template-photo { position: absolute; left: 22%; top: 13%; width: 56%; height: 74%; background: linear-gradient(135deg,#a8a39a 0 35%,#737b73 36% 65%,#c4a782 66%); }
-.template-edge { position: absolute; left: 19%; top: 10%; width: 62%; height: 80%; border: 2px solid #050505; box-sizing: border-box; }
+.template-card-preview { position: absolute; left: 19%; top: 10%; width: 62%; height: 80%; display: block; }
 
 .compact-colors { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .color-item { width: 25px; height: 25px; border: 2px solid transparent; border-radius: 50%; box-sizing: border-box; }
