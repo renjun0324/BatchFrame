@@ -143,15 +143,12 @@ page {
 .strength-row { display: flex; }
 
 .template-card { display: inline-flex; width: 88px; margin-right: 8px; padding: 0; flex-direction: column; gap: 5px; color: var(--bf-muted); background: transparent; box-sizing: border-box; font-size: 10px; }
-.frame-style-card { display: inline-flex; width: 136px; margin-right: 9px; padding: 6px; flex-direction: column; gap: 6px; border: 1px solid var(--bf-line); border-radius: 7px; color: var(--bf-muted); background: var(--bf-surface); box-sizing: border-box; font-size: 11px; }
-.basic-frame-card { width: 88px; margin-right: 8px; padding: 0; gap: 5px; border: 0; border-radius: 0; background: transparent; font-size: 10px; }
+.frame-style-card, .basic-frame-card { display: inline-flex; width: 88px; margin-right: 8px; padding: 0; flex-direction: column; gap: 5px; border: 0; border-radius: 0; color: var(--bf-muted); background: transparent; box-sizing: border-box; font-size: 10px; }
 .template-card.active, .frame-style-card.active { color: var(--bf-ink); }
 .template-card.active .template-preview { border-color: var(--bf-accent); box-shadow: inset 0 0 0 1px var(--bf-accent); }
-.frame-style-card.active:not(.basic-frame-card) { border-color: var(--bf-accent); box-shadow: inset 0 0 0 1px var(--bf-accent); }
-.basic-frame-card.active .frame-card-sample { border-color: var(--bf-accent); box-shadow: inset 0 0 0 1px var(--bf-accent); }
+.frame-style-card.active .frame-card-sample { border-color: var(--bf-accent); box-shadow: inset 0 0 0 1px var(--bf-accent); }
 .template-preview { position: relative; height: 48px; overflow: hidden; border: 1px solid var(--bf-line); background: #eee9df; box-sizing: border-box; }
-.frame-card-sample { position: relative; height: 82px; overflow: hidden; background: #eee9df; }
-.basic-frame-card .frame-card-sample { height: 48px; border: 1px solid var(--bf-line); box-sizing: border-box; }
+.frame-card-sample, .basic-frame-card .frame-card-sample { position: relative; height: 48px; overflow: hidden; border: 1px solid var(--bf-line); background: #eee9df; box-sizing: border-box; }
 .template-preview.dark { background: #20201d; }
 .template-photo, .frame-card-photo { position: absolute; left: 22%; top: 13%; width: 56%; height: 74%; background: linear-gradient(135deg,#a8a39a 0 35%,#737b73 36% 65%,#c4a782 66%); }
 .template-edge { position: absolute; left: 19%; top: 10%; width: 62%; height: 80%; border: 2px solid #050505; box-sizing: border-box; }
