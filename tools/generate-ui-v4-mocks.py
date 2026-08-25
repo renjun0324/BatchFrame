@@ -54,9 +54,9 @@ def draw_editor(active='模板', expanded=True, exporting=False, error=False, fi
     hero = fit_preview('emulsion-damage', (52, 130, 286, 178))
     image.paste(hero, (52, 148))
     if expanded:
-        strip_y = 410
-        tabs_y = 472
-        sheet_y = 516
+        strip_y = 360
+        tabs_y = 420
+        sheet_y = 462
     else:
         strip_y = 566
         tabs_y = 628
@@ -96,16 +96,15 @@ def draw_editor(active='模板', expanded=True, exporting=False, error=False, fi
         draw.line((16, sheet_y + 132, 374, sheet_y + 132), fill=LINE, width=3)
         draw.ellipse((193, sheet_y + 125, 207, sheet_y + 139), fill=ACCENT)
     else:
-        text(draw, (16, sheet_y + 24), '片基内框' if film else '基础内框', 11, MUTED)
         styles = ('film-35mm-mono', 'film-16mm-cinema', 'film-contact-sheet') if film else ('none', 'clean-black', 'emulsion-damage')
         names = ('35mm 黑白', '16mm 电影', '接触印样') if film else ('无内框', '经典细黑边', '乳剂破损边')
         active_style = 'film-16mm-cinema' if film else 'emulsion-damage'
         for index, style in enumerate(styles):
             x = 16 + index * 120
-            image.paste(fit_preview(style, (x, sheet_y + 41, 112, 70)), (x, sheet_y + 41))
+            image.paste(fit_preview(style, (x, sheet_y + 26, 112, 70)), (x, sheet_y + 26))
             if style == active_style:
-                draw.rectangle((x, sheet_y + 41, x + 112, sheet_y + 111), outline=ACCENT, width=2)
-            text(draw, (x + 56, sheet_y + 121), names[index], 10, INK if style == active_style else MUTED, anchor='ma')
+                draw.rectangle((x, sheet_y + 26, x + 112, sheet_y + 96), outline=ACCENT, width=2)
+            text(draw, (x + 56, sheet_y + 106), names[index], 10, INK if style == active_style else MUTED, anchor='ma')
     if exporting:
         draw.rounded_rectangle((16, H - 60, 374, H - 10), radius=10, fill='#B58169')
         text(draw, (195, H - 35), '处理中 1/2', 14, '#FFF9F4', True, 'mm')

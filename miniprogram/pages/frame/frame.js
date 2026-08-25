@@ -4,8 +4,6 @@ const { renderComposite } = require('../../core/compositeRenderer.js');
 const { selectMaskVariant, getMaskAssetPaths } = require('../../core/innerFrameRenderer.js');
 const { isFilmFrameStyle } = require('../../core/filmFrameStyle.js');
 const { mergeSecurityResults, summarizeSecurity } = require('../../utils/securityPreflight.js');
-const BASIC_FRAME_STYLES = INNER_FRAME_STYLES.filter(style => !style.category || style.category === 'basic-frame');
-const FILM_REBATE_STYLES = INNER_FRAME_STYLES.filter(style => style.category && style.category.indexOf('film-rebate') === 0);
 const stylePreviewAsset = styleId => (getInnerFrameStyle(styleId) || {}).previewAsset || '/assets/frame-previews/none.png';
 const sys = wx.getWindowInfo();
 const DPR = sys.pixelRatio || 1;
@@ -72,8 +70,6 @@ Page({
     borderPx: 8,
     innerFrameStyleId: 'clean-black',
     innerFrameStyles: INNER_FRAME_STYLES,
-    basicFrameStyles: BASIC_FRAME_STYLES,
-    filmRebateStyles: FILM_REBATE_STYLES,
     edgeStrengthLevel: 'medium',
     edgeStrengthOptions: EDGE_STRENGTHS,
     activeTool: 'template',
