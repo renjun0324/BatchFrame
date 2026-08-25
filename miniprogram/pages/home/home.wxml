@@ -1,18 +1,19 @@
 <view class="home" style="padding-top: {{topInset}}px;">
-  <view class="home-hero">
-    <text class="brand">BATCHFRAME</text>
-    <text class="title">批量照片装裱</text>
-    <text class="subtitle">一次处理整组照片，<br/>统一留白与胶片内框。</text>
+  <view class="home-header">
+    <text class="wordmark">BatchFrame</text>
   </view>
 
-  <view class="specimen" aria-label="乳剂破损边效果示例">
-    <view class="specimen-stage">
-      <image class="specimen-preview" src="/assets/frame-previews/emulsion-damage.png" mode="aspectFit"/>
-    </view>
+  <view class="home-hero">
+    <image
+      class="hero-image"
+      src="/assets/home/home-hero.png"
+      mode="widthFix"
+      aria-label="暖调胶片装裱效果"
+    />
   </view>
 
   <view class="home-actions">
     <button class="primary-action" bindtap="goToFrame">选择照片</button>
-    <text class="action-note">一次最多选择 9 张</text>
+    <text class="action-note">最多 9 张</text>
   </view>
 </view>

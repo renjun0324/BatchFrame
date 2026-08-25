@@ -1,22 +1,20 @@
-page { background: var(--bf-page); color: var(--bf-ink); }
+page { background: #F5F2EB; color: #26231F; }
 .home {
   height: 100vh;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 0 24px calc(24px + env(safe-area-inset-bottom));
+  padding: 0 24px calc(20px + env(safe-area-inset-bottom));
   box-sizing: border-box;
-  background: var(--bf-page);
+  background: #F5F2EB;
 }
-.home-hero { flex: 0 0 auto; }
-.brand { display: block; margin-bottom: 12px; color: var(--bf-accent); font-size: 11px; font-weight: 600; letter-spacing: .18em; }
-.title { display: block; color: var(--bf-ink); font-size: 30px; font-weight: 600; line-height: 1.16; letter-spacing: .01em; }
-.subtitle { display: block; margin-top: 12px; color: var(--bf-muted); font-size: 13px; line-height: 1.62; }
-.specimen { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; padding: 24px 0; box-sizing: border-box; }
-.specimen-stage { width: 100%; height: min(39vh, 286px); min-height: 216px; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; background: var(--bf-stage); }
-.specimen-preview { width: 100%; height: 100%; display: block; }
+.home-header { flex: 0 0 auto; }
+.wordmark { display: block; color: #26231F; font-size: 17px; font-weight: 600; line-height: 24px; letter-spacing: .02em; }
+.home-hero { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 24px 0 20px; box-sizing: border-box; }
+.hero-image { display: block; width: 86%; max-width: 340px; height: auto; box-shadow: 0 8px 28px rgba(30, 25, 20, .08); }
 .home-actions { flex: 0 0 auto; display: flex; flex-direction: column; align-items: stretch; }
-.primary-action { min-height: 50px; color: #FFF9F4; background: var(--bf-accent); border-radius: 10px; font-size: 15px; font-weight: 600; line-height: 50px; letter-spacing: .02em; }
+.primary-action { width: 100%; min-height: 50px; margin: 0; padding: 0 16px; color: #FAF8F3; background: #26231F; border-radius: 8px; font-size: 15px; font-weight: 600; line-height: 50px; letter-spacing: .01em; box-sizing: border-box; }
 .primary-action::after { border: 0; }
-.action-note { margin-top: 9px; color: var(--bf-muted); font-size: 11px; text-align: center; }
+.primary-action:active { opacity: .82; }
+.action-note { margin-top: 9px; color: #8A8378; font-size: 11px; line-height: 16px; text-align: center; }
