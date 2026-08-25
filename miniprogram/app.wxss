@@ -1,1 +1,17 @@
-page{background:#f1eee7;color:#292721;font-family:system-ui,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;}
+page {
+  --bf-page: #F3F0E9;
+  --bf-surface: #FAF8F3;
+  --bf-surface-muted: #ECE7DE;
+  --bf-stage: #151513;
+  --bf-stage-raised: #201F1C;
+  --bf-ink: #26231F;
+  --bf-muted: #777064;
+  --bf-line: #DDD6CA;
+  --bf-line-strong: #C9C0B3;
+  --bf-accent: #A65332;
+  --bf-accent-soft: #EFE0D7;
+  --bf-danger: #9B3A32;
+  background: var(--bf-page);
+  color: var(--bf-ink);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}

@@ -1,26 +1,18 @@
-<view class="home">
-  <view class="hero">
-    <text class="eyebrow">BATCHFRAME</text>
+<view class="home" style="padding-top: {{topInset}}px;">
+  <view class="home-hero">
+    <text class="brand">BATCHFRAME</text>
     <text class="title">批量照片装裱</text>
-    <text class="subtitle">统一留白、内框与出图比例，让一组照片成为一组作品。</text>
+    <text class="subtitle">一次处理整组照片，<br/>统一留白与胶片内框。</text>
   </view>
 
-  <view class="specimen" aria-label="照片装裱效果示例">
-    <view class="specimen-canvas">
-      <view class="specimen-frame">
-        <view class="specimen-photo"></view>
-      </view>
+  <view class="specimen" aria-label="乳剂破损边效果示例">
+    <view class="specimen-stage">
+      <image class="specimen-preview" src="/assets/frame-previews/emulsion-damage.png" mode="aspectFit"/>
     </view>
   </view>
 
   <view class="home-actions">
     <button class="primary-action" bindtap="goToFrame">选择照片</button>
-    <text class="action-note">支持一次选择最多 9 张照片</text>
-  </view>
-
-  <view class="feature-list">
-    <view class="feature-item"><text class="feature-index">01</text><text>统一画布与外层留白</text></view>
-    <view class="feature-item"><text class="feature-index">02</text><text>选择摄影装裱或片基内框</text></view>
-    <view class="feature-item"><text class="feature-index">03</text><text>批量保存成片</text></view>
+    <text class="action-note">一次最多选择 9 张</text>
   </view>
 </view>
