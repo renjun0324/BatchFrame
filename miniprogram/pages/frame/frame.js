@@ -4,7 +4,6 @@ const { renderComposite } = require('../../core/compositeRenderer.js');
 const { selectMaskVariant, getMaskAssetPaths } = require('../../core/innerFrameRenderer.js');
 const { isFilmFrameStyle } = require('../../core/filmFrameStyle.js');
 const { mergeSecurityResults, summarizeSecurity } = require('../../utils/securityPreflight.js');
-const stylePreviewAsset = styleId => (getInnerFrameStyle(styleId) || {}).previewAsset || '/assets/frame-previews/none.png';
 const sys = wx.getWindowInfo();
 const DPR = sys.pixelRatio || 1;
 
@@ -72,8 +71,8 @@ Page({
     innerFrameStyles: INNER_FRAME_STYLES,
     edgeStrengthLevel: 'medium',
     edgeStrengthOptions: EDGE_STRENGTHS,
-    activeTool: 'template',
-    toolOptions: ['template', 'canvas', 'frame'],
+    activeTool: 'canvas',
+    toolOptions: ['canvas', 'frame'],
     panelExpanded: true,
     panelScrollTop: 0,
     currentStyleSupportsStrength: false,
@@ -94,16 +93,6 @@ Page({
     frameNumberEnabled: true,
     frameMarkersEnabled: true,
     frameDetailsExpanded: false,
-    templates: [
-      { id: 'white-clean', name: '白底经典', outerBgColor: '#FFFFFF', styleId: 'clean-black', previewAsset: stylePreviewAsset('clean-black'), enableOuterBg: true },
-      { id: 'white-scan', name: '白底扫描', outerBgColor: '#FFFFFF', styleId: 'full-frame-scan', previewAsset: stylePreviewAsset('full-frame-scan'), enableOuterBg: true },
-      { id: 'white-scan-emulsion', name: '白底原片', outerBgColor: '#FFFFFF', styleId: 'scan-emulsion-edge', previewAsset: stylePreviewAsset('scan-emulsion-edge'), enableOuterBg: true },
-      { id: 'white-gate', name: '白底片门', outerBgColor: '#FFFFFF', styleId: 'film-gate', previewAsset: stylePreviewAsset('film-gate'), enableOuterBg: true },
-      { id: 'white-negative', name: '白底35mm', outerBgColor: '#FFFFFF', styleId: 'film-strip-35mm-full', previewAsset: stylePreviewAsset('film-strip-35mm-full'), enableOuterBg: true },
-      { id: 'white-emulsion', name: '白底乳剂', outerBgColor: '#FFFFFF', styleId: 'emulsion-damage', previewAsset: stylePreviewAsset('emulsion-damage'), enableOuterBg: true },
-      { id: 'black-clean', name: '黑底经典', outerBgColor: '#000000', styleId: 'clean-black', previewAsset: stylePreviewAsset('clean-black'), enableOuterBg: true },
-      { id: 'white-none', name: '白底无框', outerBgColor: '#FFFFFF', styleId: 'none', previewAsset: stylePreviewAsset('none'), enableOuterBg: true }
-    ],
     // zoom controls the complete mounted module. It stays internal so the
     // canvas layout remains stable; imageZoom is the user-facing crop scale.
     zoom: 0.95,
@@ -432,7 +421,11 @@ Page({
   },
 
   togglePanel(){
-    this.setData({ panelExpanded: !this.data.panelExpanded }, () => this.measurePreviewViewport());
+    this.setData({ panelExpanded: !this.data.panelExpanded }, () => {
+      const refresh = () => this.measurePreviewViewport();
+      if (wx.nextTick) wx.nextTick(refresh);
+      else refresh();
+    });
   },
 
   measurePreviewViewport(){
@@ -447,25 +440,8 @@ Page({
       this.setData({
         displayWidth: Math.max(1, Math.floor(logicalW * scale)),
         displayHeight: Math.max(1, Math.floor(logicalH * scale))
-      });
+      }, () => this.redrawPreview());
     }).exec();
-  },
-
-  onTemplateTap(e){
-    const template = (this.data.templates || []).find(item => item.id === e.currentTarget.dataset.templateId);
-    if (!template) return;
-    const style = getInnerFrameStyle(template.styleId);
-    const width = template.styleId === 'none' ? 0 : (this._frameWidths[template.styleId] || style.widthAt1800);
-    const canvasBg = template.enableOuterBg ? template.outerBgColor : 'transparent';
-    this.setData({
-      outerBgColor: template.outerBgColor,
-      canvasBg,
-      enableOuterBg: template.enableOuterBg,
-      innerFrameStyleId: style.id,
-      enableInnerBorder: style.id !== 'none',
-      borderPx: width,
-      ...styleControlPatch(style)
-    }, this.redrawPreview);
   },
 
   // 比例/方向/尺寸

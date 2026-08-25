@@ -35,7 +35,6 @@
       <view wx:for="{{toolOptions}}" wx:key="*this"
             class="tool-tab {{activeTool===item?'active':''}}"
             data-tool="{{item}}" bindtap="onToolTap">
-        <text wx:if="{{item==='template'}}">模板</text>
         <text wx:if="{{item==='canvas'}}">画面</text>
         <text wx:if="{{item==='frame'}}">内框</text>
       </view>
@@ -45,19 +44,6 @@
 
   <view class="setting-sheet {{activeTool}} {{panelExpanded?'expanded':'collapsed'}}">
     <view class="setting-content">
-      <view wx:if="{{activeTool==='template'}}" class="tool-panel">
-        <scroll-view class="template-list" scroll-x>
-          <view wx:for="{{templates}}" wx:key="id"
-                class="template-card {{innerFrameStyleId===item.styleId && outerBgColor===item.outerBgColor?'active':''}}"
-                data-template-id="{{item.id}}" bindtap="onTemplateTap">
-            <view class="template-preview" style="background: {{item.outerBgColor}};">
-              <image class="template-card-preview" src="{{item.previewAsset}}" mode="aspectFill"/>
-            </view>
-            <text>{{item.name}}</text>
-          </view>
-        </scroll-view>
-      </view>
-
       <view wx:if="{{activeTool==='canvas'}}" class="tool-panel">
         <text class="field-label">输出比例</text>
         <scroll-view class="chip-row" scroll-x>
