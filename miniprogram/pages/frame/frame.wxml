@@ -110,9 +110,8 @@
             <view wx:for="{{basicFrameStyles}}" wx:key="id"
                   class="frame-style-card basic-frame-card {{innerFrameStyleId===item.id?'active':''}}"
                   data-style-id="{{item.id}}" bindtap="onInnerFrameStyleTap">
-            <view class="frame-card-sample {{item.id}}">
-              <view class="frame-card-photo"></view>
-              <view class="frame-card-edge"></view>
+            <view class="frame-card-sample">
+              <image class="frame-card-preview" src="{{item.previewAsset}}" mode="aspectFill"/>
             </view>
             <text>{{item.name}}</text>
           </view>
@@ -122,9 +121,8 @@
           <view wx:for="{{filmRebateStyles}}" wx:key="id"
                 class="frame-style-card {{innerFrameStyleId===item.id?'active':''}}"
                 data-style-id="{{item.id}}" bindtap="onInnerFrameStyleTap">
-            <view class="frame-card-sample {{item.id}}">
-              <view class="frame-card-photo"></view>
-              <view class="frame-card-edge"></view>
+            <view class="frame-card-sample">
+              <image class="frame-card-preview" src="{{item.previewAsset}}" mode="aspectFill"/>
             </view>
             <text>{{item.name}}</text>
           </view>

@@ -35,7 +35,10 @@ def audit() -> int:
         parts = set(relative.parts)
         if parts & FORBIDDEN_PARTS or path.suffix.lower() in FORBIDDEN_SUFFIXES:
             forbidden.append(relative)
-        if path.name.lower() in FORBIDDEN_NAMES or "contact-sheet" in path.name.lower():
+        # A production style may legitimately be named "film-contact-sheet".
+        # Documentation directories are already forbidden above, so only reject
+        # the known README/sample filenames here rather than product style IDs.
+        if path.name.lower() in FORBIDDEN_NAMES:
             forbidden.append(relative)
 
     total = sum(path.stat().st_size for path in files)
