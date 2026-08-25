@@ -16,10 +16,14 @@ assert(wxml.includes('min="50" max="200"'), 'image scaling must support zooming 
 assert(!wxml.includes('完整显示'), 'non-interactive fit copy should not be shown');
 assert(wxml.includes('displayWidth') && wxml.includes('displayHeight'));
 assert(wxml.includes('class="setting-scroll"'));
+assert(wxml.includes('basic-frame-card'), 'basic frame cards should have their own compact treatment');
+assert(!wxml.includes('frame-card-preview'), 'frame selector must not embed the repository sample image');
 assert(wxss.includes('.workspace') && wxss.includes('overflow: hidden'));
 assert(wxss.includes('.preview-stage') && wxss.includes('.setting-sheet'));
 assert(wxss.includes('--bf-accent') && wxss.includes('--bf-page'), 'gallery palette tokens must be defined');
 assert(!wxss.includes('.main-panel'), 'legacy vertical editor shell should be removed');
+assert(wxss.includes('.basic-frame-card { width: 88px'), 'basic frame cards should match template card width');
+assert(wxss.includes('.basic-frame-card .frame-card-sample { height: 48px'), 'basic frame samples should match template card height');
 assert(js.includes('measurePreviewViewport'));
 assert(js.includes('panelScrollTop: 0'));
 assert(js.includes("toolOptions: ['template', 'canvas', 'frame']"));

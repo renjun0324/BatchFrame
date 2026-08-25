@@ -108,10 +108,11 @@
         <view class="frame-group-title">基础内框</view>
         <scroll-view class="frame-style-list" scroll-x>
             <view wx:for="{{basicFrameStyles}}" wx:key="id"
-                  class="frame-style-card {{innerFrameStyleId===item.id?'active':''}}"
+                  class="frame-style-card basic-frame-card {{innerFrameStyleId===item.id?'active':''}}"
                   data-style-id="{{item.id}}" bindtap="onInnerFrameStyleTap">
             <view class="frame-card-sample {{item.id}}">
-              <image class="frame-card-preview" src="{{item.previewAsset}}" mode="aspectFill"></image>
+              <view class="frame-card-photo"></view>
+              <view class="frame-card-edge"></view>
             </view>
             <text>{{item.name}}</text>
           </view>
@@ -122,7 +123,8 @@
                 class="frame-style-card {{innerFrameStyleId===item.id?'active':''}}"
                 data-style-id="{{item.id}}" bindtap="onInnerFrameStyleTap">
             <view class="frame-card-sample {{item.id}}">
-              <image class="frame-card-preview" src="{{item.previewAsset}}" mode="aspectFill"></image>
+              <view class="frame-card-photo"></view>
+              <view class="frame-card-edge"></view>
             </view>
             <text>{{item.name}}</text>
           </view>
