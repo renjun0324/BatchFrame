@@ -2,8 +2,8 @@
   <view class="top-bar" wx:if="{{images.length}}">
     <view class="top-title">
       <text class="app-name">{{images.length}} 张照片</text>
+      <view class="top-add" bindtap="chooseImages">＋ 添加照片</view>
     </view>
-    <view class="top-add" bindtap="chooseImages">＋ 添加</view>
   </view>
 
   <view class="preview-stage">

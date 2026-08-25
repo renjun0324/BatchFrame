@@ -13,7 +13,7 @@ page { background: var(--bf-page); }
 }
 
 .top-bar {
-  flex: 0 0 38px;
+  flex: 0 0 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -21,9 +21,9 @@ page { background: var(--bf-page); }
   box-sizing: border-box;
   background: var(--bf-surface);
 }
-.top-title { display: flex; align-items: baseline; }
+.top-title { display: flex; align-items: center; gap: 12px; }
 .app-name { color: var(--bf-muted); font-size: 12px; font-weight: 500; }
-.top-add { padding: 8px 0 8px 14px; color: var(--bf-accent); font-size: 12px; font-weight: 600; }
+.top-add { padding: 6px 0; color: var(--bf-accent); font-size: 12px; font-weight: 600; }
 
 .btn {
   min-height: 40px;
@@ -43,12 +43,12 @@ page { background: var(--bf-page); }
 .preview-stage {
   position: relative;
   flex: 1 1 auto;
-  min-height: 160px;
+  min-height: 128px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 22px;
+  padding: 16px;
   box-sizing: border-box;
   background: var(--bf-stage);
 }
@@ -76,7 +76,7 @@ page { background: var(--bf-page); }
 .empty-copy { color: #c9c1b3; font-size: 12px; line-height: 1.55; }
 
 .thumbnail-strip {
-  flex: 0 0 62px;
+  flex: 0 0 60px;
   width: 100%;
   white-space: nowrap;
   padding: 6px 14px;
@@ -85,7 +85,7 @@ page { background: var(--bf-page); }
   border-bottom: 1px solid var(--bf-line);
 }
 .thumbnail-wrap { position: relative; display: inline-block; margin-right: 8px; }
-.thumbnail { display: block; width: 50px; height: 50px; border: 2px solid transparent; border-radius: 2px; box-sizing: border-box; background: var(--bf-surface-muted); }
+.thumbnail { display: block; width: 48px; height: 48px; border: 2px solid transparent; border-radius: 2px; box-sizing: border-box; background: var(--bf-surface-muted); }
 .thumbnail.active { border-color: var(--bf-accent); }
 .security-dot { position: absolute; right: 3px; top: 3px; width: 11px; height: 11px; border-radius: 50%; color: #fff; text-align: center; font-size: 8px; line-height: 11px; }
 .security-dot.checking { background: #b77b22; animation: security-pulse 1s ease-in-out infinite; }
@@ -94,7 +94,7 @@ page { background: var(--bf-page); }
 @keyframes security-pulse { 50% { opacity: .38; } }
 
 .tool-tabs {
-  flex: 0 0 44px;
+  flex: 0 0 42px;
   display: flex;
   align-items: stretch;
   padding: 0 28px;
@@ -106,7 +106,7 @@ page { background: var(--bf-page); }
 .tool-tab.active { color: var(--bf-ink); font-weight: 600; }
 .tool-tab.active::after { position: absolute; bottom: 0; width: 24px; height: 2px; background: var(--bf-accent); content: ''; }
 
-.setting-sheet { flex: 0 0 164px; overflow: hidden; background: var(--bf-surface); transition: flex-basis .18s ease; }
+.setting-sheet { flex: 0 0 224px; overflow: hidden; background: var(--bf-surface); transition: flex-basis .18s ease; }
 .setting-sheet.collapsed { flex-basis: 20px; }
 .panel-handle { height: 20px; display: flex; align-items: center; justify-content: center; }
 .panel-handle-bar { width: 28px; height: 3px; border-radius: 2px; background: var(--bf-line-strong); }
@@ -152,8 +152,8 @@ page { background: var(--bf-page); }
 .advanced-chevron.up { transform: rotate(180deg) translateY(2px); }
 .advanced-settings { margin-top: 2px; border-top: 1px solid var(--bf-line); }
 
-.bottom-actions { flex: 0 0 66px; padding: 8px 16px 10px; box-sizing: border-box; background: var(--bf-surface); }
-.export-btn { width: 100%; min-height: 50px; border-radius: 10px; line-height: 50px; background: var(--bf-accent); font-size: 15px; font-weight: 600; letter-spacing: .02em; }
+.bottom-actions { flex: 0 0 58px; padding: 7px 16px; box-sizing: border-box; background: var(--bf-surface); }
+.export-btn { width: 100%; min-height: 44px; border-radius: 8px; line-height: 44px; background: var(--bf-accent); font-size: 14px; font-weight: 600; letter-spacing: .02em; }
 .export-btn[disabled] { color: #8c857b; background: var(--bf-surface-muted); }
 
 .color-picker-modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: flex-end; }
