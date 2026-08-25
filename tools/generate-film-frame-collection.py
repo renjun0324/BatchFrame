@@ -39,6 +39,7 @@ STYLE_LABELS = {
     'film-contact-sheet': '接触印样',
 }
 OUTER = '#FFFFFF'
+SELECTOR_BACKGROUND = '#EEE9DF'
 
 
 def font(size):
@@ -131,9 +132,9 @@ def draw_text(draw, item):
               fill=item['color'], font=font(item['fontSize']))
 
 
-def render(style_id, size, margin, title=None, source=None):
+def render(style_id, size, margin, title=None, source=None, background=OUTER):
     source = source or photo_source()
-    canvas = Image.new('RGB', size, OUTER)
+    canvas = Image.new('RGB', size, background)
     layout = production_layout(style_id, size[0], size[1], source.width / source.height, margin)
     style = layout['style']
     frame = layout['frameRect']
@@ -142,7 +143,7 @@ def render(style_id, size, margin, title=None, source=None):
     paste_aperture(canvas, source, layout['apertureRect'])
     decorations = layout['decorationRects']
     for item in decorations['perforations']:
-        draw_perforation(draw, item, OUTER)
+        draw_perforation(draw, item, background)
     for item in decorations['labels']:
         draw_text(draw, item)
     for item in decorations['frameNumbers']:
@@ -179,7 +180,7 @@ def generate_previews():
     PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
     source = photo_source()
     for style_id in RUNTIME_PREVIEW_IDS:
-        image = render_legacy_medium_preview((240, 150), source) if style_id == 'medium-format-120' else render(style_id, (240, 150), 18, source=source)[0]
+        image = render_legacy_medium_preview((240, 150), source) if style_id == 'medium-format-120' else render(style_id, (240, 150), 18, source=source, background=SELECTOR_BACKGROUND)[0]
         output = PREVIEW_DIR / f'{style_id}.png'
         image.save(output, optimize=True)
         if output.stat().st_size > 15 * 1024:

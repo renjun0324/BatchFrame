@@ -26,6 +26,8 @@ REVIEW = ROOT / 'docs' / 'production-frame-review'
 SEGMENTS = ('top-left', 'top', 'top-right', 'right', 'bottom-right', 'bottom', 'bottom-left', 'left')
 WARM = ((216, 190, 120, 184), (228, 208, 154, 158), (185, 149, 76, 184), (238, 227, 197, 132))
 BLACK = (5, 5, 5, 145)
+PRODUCTION_BG = '#FFFFFF'
+PREVIEW_BG = '#EEE9DF'
 
 
 def review_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -187,9 +189,9 @@ console.log(JSON.stringify({ result, calls }));
     return json.loads(completed.stdout)
 
 
-def composite_scan(size: tuple[int, int], border: int = 18, variant: int = 1) -> Image.Image:
+def composite_scan(size: tuple[int, int], border: int = 18, variant: int = 1, background: str = PRODUCTION_BG) -> Image.Image:
     width, height = size
-    canvas = Image.new('RGB', size, '#FFFFFF').convert('RGBA')
+    canvas = Image.new('RGB', size, background).convert('RGBA')
     draw = ImageDraw.Draw(canvas)
     pw, ph = int(width * 0.62), int(height * 0.58)
     px, py = (width - pw) // 2, (height - ph) // 2
@@ -210,7 +212,7 @@ def composite_scan(size: tuple[int, int], border: int = 18, variant: int = 1) ->
 
 def composite_other_basic(size: tuple[int, int], kind: str) -> Image.Image:
     width, height = size
-    canvas = Image.new('RGB', size, '#FFFFFF')
+    canvas = Image.new('RGB', size, PRODUCTION_BG)
     draw = ImageDraw.Draw(canvas)
     pw, ph = int(width * 0.62), int(height * 0.58)
     px, py = (width - pw) // 2, (height - ph) // 2
@@ -245,7 +247,7 @@ def composite_other_basic(size: tuple[int, int], kind: str) -> Image.Image:
 
 def make_preview() -> None:
     PREVIEW.parent.mkdir(parents=True, exist_ok=True)
-    preview = composite_scan((240, 150), border=6, variant=2)
+    preview = composite_scan((240, 150), border=6, variant=2, background=PREVIEW_BG)
     preview.save(PREVIEW, optimize=True)
 
 

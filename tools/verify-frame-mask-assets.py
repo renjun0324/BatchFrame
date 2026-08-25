@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Validate generated frame mask count, alpha channels, dimensions and size."""
+"""Validate frame masks and the shared selector-preview presentation."""
 
 from pathlib import Path
 from PIL import Image
 
 
-ROOT = Path(__file__).resolve().parents[1] / "miniprogram" / "assets" / "frame-masks"
+ASSET_ROOT = Path(__file__).resolve().parents[1] / "miniprogram" / "assets"
+ROOT = ASSET_ROOT / "frame-masks"
+PREVIEW_ROOT = ASSET_ROOT / "frame-previews"
 TIERED = {"full-frame-scan": 3, "emulsion-damage": 3}
 NON_TIERED = {"scan-emulsion-edge": 3}
 TIERS = ("light", "medium", "strong")
@@ -38,4 +40,17 @@ for style, variants in NON_TIERED.items():
 
 assert {path.name for path in ROOT.iterdir() if path.is_dir()} == set(TIERED) | set(NON_TIERED), "stale or missing production mask style"
 
-print("frame mask asset tests passed")
+preview_files = sorted(PREVIEW_ROOT.glob("*.png"))
+assert preview_files, "frame selector previews are missing"
+for file in preview_files:
+    image = Image.open(file).convert("RGB")
+    assert image.size == (240, 150), (file, image.size)
+    corners = (
+        image.getpixel((0, 0)),
+        image.getpixel((image.width - 1, 0)),
+        image.getpixel((0, image.height - 1)),
+        image.getpixel((image.width - 1, image.height - 1)),
+    )
+    assert all(pixel == (238, 233, 223) for pixel in corners), (file, corners)
+
+print("frame mask and selector preview asset tests passed")
