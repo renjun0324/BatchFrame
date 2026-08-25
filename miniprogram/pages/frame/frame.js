@@ -2,6 +2,7 @@ const contentSecurity = require('../../utils/contentSecurity.js');
 const { INNER_FRAME_STYLES, EDGE_STRENGTHS, getInnerFrameStyle } = require('../../core/innerFrameStyles.js');
 const { renderComposite } = require('../../core/compositeRenderer.js');
 const { selectMaskVariant, getMaskAssetPaths } = require('../../core/innerFrameRenderer.js');
+const { isFilmFrameStyle } = require('../../core/filmFrameStyle.js');
 const { mergeSecurityResults, summarizeSecurity } = require('../../utils/securityPreflight.js');
 const BASIC_FRAME_STYLES = INNER_FRAME_STYLES.filter(style => !style.category || style.category === 'basic-frame');
 const FILM_REBATE_STYLES = INNER_FRAME_STYLES.filter(style => style.category && style.category.indexOf('film-rebate') === 0);
@@ -37,7 +38,7 @@ function imageRecord(path, index) {
 }
 
 function styleControlPatch(style) {
-  const structured = style && style.layoutModel === 'film-rebate';
+  const structured = isFilmFrameStyle(style);
   return {
     currentStyleSupportsStrength: !!(style && style.supportsStrength),
     currentStyleSupportsColor: !!(style && style.supportsColor),

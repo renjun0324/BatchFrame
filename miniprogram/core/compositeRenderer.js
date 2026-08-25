@@ -2,6 +2,7 @@ const { getInnerFrameStyle, getEdgeStrength } = require('./innerFrameStyles');
 const { calculateImageRect, getLongEdge, scaleFrameWidth } = require('./frameGeometry');
 const { drawImageWithInnerFrame } = require('./innerFrameRenderer');
 const { layoutInnerFrame } = require('./innerFrameLayout');
+const { isFilmFrameStyle } = require('./filmFrameStyle');
 
 /**
  * The only Canvas composition entry point used by preview and export.
@@ -34,7 +35,7 @@ function renderComposite({
   if (!image) return { imageRect: null, frameWidth: 0, styleId: 'none' };
   const style = getInnerFrameStyle(innerFrameSettings.styleId);
   const enabled = innerFrameSettings.enabled !== false && style.id !== 'none';
-  if (enabled && style.layoutModel === 'film-rebate') {
+  if (enabled && isFilmFrameStyle(style)) {
     const layout = layoutInnerFrame({
       outputRect: { x: 0, y: 0, width, height },
       outerLayout: {
@@ -44,7 +45,8 @@ function renderComposite({
       imageAspect: image.width / Math.max(1, image.height),
       style,
       frameSizePreset: innerFrameSettings.frameSizePreset || 'standard',
-      orientation: image.width < image.height ? 'portrait' : 'landscape'
+      orientation: image.width < image.height ? 'portrait' : 'landscape',
+      frameIndex: innerFrameSettings.frameIndex || 1
     });
     const filmPaths = drawImageWithInnerFrame({
       ctx,

@@ -65,59 +65,68 @@ const INNER_FRAME_STYLES = Object.freeze([
   },
   {
     id: 'film-strip-35mm-full', name: '35mm 完整片基', category: 'film-rebate',
-    renderer: FRAME_RENDERER_TYPES.FILM_REBATE_LAYOUT, layoutModel: 'film-rebate',
+    renderer: FRAME_RENDERER_TYPES.FILM_FRAME, layoutModel: 'film-frame',
     color: '#030303', supportsColor: false, supportsStrength: false,
     supportsFrameSize: true, supportsPerforations: true, supportsEdgeLabel: true,
     supportsFrameNumber: true, supportsMarkers: true,
     previewAsset: '/assets/frame-previews/film-strip-35mm-full.png',
     supportedRatios: ['1:1', '2:3', '3:4', '4:5', '16:9'],
-    geometry: {
-      frameAspectPolicy: 'derived-from-aperture',
-      rebates: { topRatio: 0.154, rightRatio: 0.027, bottomRatio: 0.154, leftRatio: 0.027 }
-    },
-    perforations: { enabled: true, sides: ['top', 'bottom'], shape: 'rounded-rect', count: 8, widthRatio: 0.055, heightRatio: 0.077, cornerRadiusRatio: 0.018 },
-    labels: { enabled: true, position: 'top-left', textPreset: 'BATCHFRAME COLOR 400' },
-    frameNumbers: { enabled: true, positions: ['bottom-left', 'bottom-center'] },
-    markers: { enabled: true, positions: ['bottom-right'] },
-    filmLayout: {
-      geometry: { rebates: { topRatio: 0.154, rightRatio: 0.027, bottomRatio: 0.154, leftRatio: 0.027 } },
+    frame: {
+      color: '#030303',
       sizePresets: {
-        compact: { topScale: 0.78, rightScale: 0.82, bottomScale: 0.78, leftScale: 0.82 },
-        standard: { topScale: 1, rightScale: 1, bottomScale: 1, leftScale: 1 }
-      },
-      perforations: { enabled: true, count: 8, widthRatio: 0.055, heightRatio: 0.077, cornerRadiusRatio: 0.018 },
-      edgeLabel: true,
-      frameNumber: true,
-      markers: true
-    }
+        compact: { top: 0.78, right: 0.82, bottom: 0.78, left: 0.82 },
+        standard: { top: 1, right: 1, bottom: 1, left: 1 }
+      }
+    },
+    geometry: {
+      rebates: { top: 0.154, right: 0.027, bottom: 0.154, left: 0.027 },
+      orientationPolicy: 'rotate-film-layout',
+      aperture: { shape: 'rect', cornerRadiusRatio: 0 }
+    },
+    perforations: { enabled: true, sides: ['top', 'bottom'], shape: 'rounded-rect', count: 8, widthRatio: 0.055, heightRatio: 0.077, cornerRadiusRatio: 0.018, gapPolicy: 'even', color: 'outer-background' },
+    decorations: {
+      labels: [{ enabled: true, text: 'BATCHFRAME COLOR 400', color: '#F3A126', anchor: 'top-start', sizeRatio: 0.035, spanRatio: 0.35, portraitRotation: 'counter-clockwise' }],
+      frameNumbers: [
+        { enabled: true, value: 'sequence-2-digit', color: '#F3A126', anchor: 'bottom-start', sizeRatio: 0.04, spanRatio: 0.12 },
+        { enabled: true, value: 'sequence-alpha', color: '#F3A126', anchor: 'bottom-center', sizeRatio: 0.04, spanRatio: 0.08 }
+      ],
+      markers: [{ enabled: true, type: 'triangle', color: '#F3A126', anchor: 'bottom-end', sizeRatio: 0.025, spanRatio: 0.04 }]
+    },
+    material: { textureOverlay: null }
   },
   {
     id: 'film-rebate-minimal', name: '极简胶片边码', category: 'film-rebate',
-    renderer: FRAME_RENDERER_TYPES.FILM_REBATE_LAYOUT, layoutModel: 'film-rebate',
+    renderer: FRAME_RENDERER_TYPES.FILM_FRAME, layoutModel: 'film-frame',
     color: '#030303', supportsColor: false, supportsStrength: false,
     supportsFrameSize: true, supportsPerforations: false, supportsEdgeLabel: true,
     supportsFrameNumber: true, supportsMarkers: true,
     previewAsset: '/assets/frame-previews/film-rebate-minimal.png',
     supportedRatios: ['1:1', '2:3', '3:4', '4:5', '9:16', '16:9'],
-    geometry: {
-      frameAspectPolicy: 'derived-from-aperture',
-      rebates: { topRatio: 0.033, rightRatio: 0.032, bottomRatio: 0.032, leftRatio: 0.032 }
-    },
-    perforations: { enabled: false, sides: [], shape: 'none', count: 0, widthRatio: 0, heightRatio: 0, cornerRadiusRatio: 0 },
-    labels: { enabled: true, position: 'top-left', textPreset: 'BATCHFRAME COLOR 400' },
-    frameNumbers: { enabled: true, positions: ['top-right', 'bottom-center'] },
-    markers: { enabled: true, positions: ['bottom-left', 'bottom-right'] },
-    filmLayout: {
-      geometry: { rebates: { topRatio: 0.033, rightRatio: 0.032, bottomRatio: 0.032, leftRatio: 0.032 } },
+    frame: {
+      color: '#030303',
       sizePresets: {
-        compact: { topScale: 0.82, rightScale: 0.82, bottomScale: 0.82, leftScale: 0.82 },
-        standard: { topScale: 1, rightScale: 1, bottomScale: 1, leftScale: 1 }
-      },
-      perforations: { enabled: false, count: 0, widthRatio: 0, heightRatio: 0, cornerRadiusRatio: 0 },
-      edgeLabel: true,
-      frameNumber: true,
-      markers: true
-    }
+        compact: { top: 0.82, right: 0.82, bottom: 0.82, left: 0.82 },
+        standard: { top: 1, right: 1, bottom: 1, left: 1 }
+      }
+    },
+    geometry: {
+      rebates: { top: 0.033, right: 0.032, bottom: 0.032, left: 0.032 },
+      orientationPolicy: 'rotate-film-layout',
+      aperture: { shape: 'rect', cornerRadiusRatio: 0 }
+    },
+    perforations: { enabled: false, sides: [], shape: 'rect', count: 0, widthRatio: 0.01, heightRatio: 0.01, cornerRadiusRatio: 0, gapPolicy: 'even', color: 'outer-background' },
+    decorations: {
+      labels: [{ enabled: true, text: 'BATCHFRAME  ·  07', color: '#F3A126', anchor: 'top-start', sizeRatio: 0.035, spanRatio: 0.4 }],
+      frameNumbers: [
+        { enabled: true, value: 'sequence-2-digit', color: '#F3A126', anchor: 'top-end', sizeRatio: 0.04, spanRatio: 0.1 },
+        { enabled: true, value: 'sequence', color: '#F3A126', anchor: 'bottom-center', sizeRatio: 0.04, spanRatio: 0.08 }
+      ],
+      markers: [
+        { enabled: true, type: 'triangle', color: '#F3A126', anchor: 'bottom-start', sizeRatio: 0.025, spanRatio: 0.04 },
+        { enabled: true, type: 'triangle', color: '#F3A126', anchor: 'bottom-end', sizeRatio: 0.025, spanRatio: 0.04 }
+      ]
+    },
+    material: { textureOverlay: null }
   },
   {
     id: 'medium-format-120', name: '120 中画幅', category: 'film-rebate-legacy', renderer: FRAME_RENDERER_TYPES.MEDIUM_FORMAT_REBATE,

@@ -65,8 +65,8 @@ function testStyleRegistry() {
       assert.notStrictEqual(style.layoutModel, 'film-rebate');
       assert.strictEqual(style.maskTiered, false);
     }
-    if (style.id === 'film-strip-35mm-full') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.FILM_REBATE_LAYOUT);
-    if (style.id === 'film-rebate-minimal') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.FILM_REBATE_LAYOUT);
+    if (style.id === 'film-strip-35mm-full') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.FILM_FRAME);
+    if (style.id === 'film-rebate-minimal') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.FILM_FRAME);
     if (style.id === 'medium-format-120') assert.strictEqual(style.renderer, FRAME_RENDERER_TYPES.MEDIUM_FORMAT_REBATE);
   });
 }
@@ -74,7 +74,7 @@ function testStyleRegistry() {
 function testPathBoundsAndThickness() {
   const photoRect = { x: 300, y: 240, width: 1200, height: 720 };
   for (const style of INNER_FRAME_STYLES) {
-    if (style.id === 'none' || style.layoutModel === 'film-rebate') continue;
+    if (style.id === 'none' || style.layoutModel === 'film-rebate' || style.layoutModel === 'film-frame') continue;
     const paths = buildFramePaths({
       photoRect,
       frameWidth: scaleFrameWidth(style.widthAt1800, 1800),

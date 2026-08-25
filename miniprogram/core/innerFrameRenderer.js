@@ -3,6 +3,10 @@ const {
   getInnerFrameStyle,
   getStrengthPreset
 } = require('./innerFrameStyles');
+const {
+  normalizeFilmFrameStyle,
+  normalizeRendererType
+} = require('./filmFrameStyle');
 const { clamp, getFrameRect, calculateApertureImageRect } = require('./frameGeometry');
 
 const PROFILE_CACHE_LIMIT = 128;
@@ -84,8 +88,18 @@ function getCachedNormalizedEdgeProfile(options = {}) {
   return profile;
 }
 
+function selectTextureVariant(textureOverlay, styleId, seed) {
+  const count = Math.max(1, Number(textureOverlay && textureOverlay.variants) || 1);
+  return hashSeed(`${styleId}:texture:${seed}`) % count + 1;
+}
+
 function selectMaskVariant(styleId, seed, strengthLevel = 'medium') {
   const style = getInnerFrameStyle(styleId);
+  const canonical = normalizeRendererType(style.renderer) === FRAME_RENDERER_TYPES.FILM_FRAME
+    ? normalizeFilmFrameStyle(style)
+    : null;
+  const overlay = canonical && canonical.material.textureOverlay;
+  if (overlay) return selectTextureVariant(overlay, style.id, seed);
   const count = Math.max(1, Number(style.maskVariants) || 1);
   // A hidden stale strength value must not alter a fixed material style.
   const strengthKey = style.supportsStrength ? strengthLevel : 'fixed';
@@ -94,13 +108,18 @@ function selectMaskVariant(styleId, seed, strengthLevel = 'medium') {
 
 function getMaskAssetPaths(styleId, variant, strengthLevel = 'medium') {
   const style = getInnerFrameStyle(styleId);
-  if (!style.maskRoot || !style.maskVariants) return null;
-  const selected = Math.max(1, Math.min(style.maskVariants, Number(variant) || 1));
+  const canonical = normalizeRendererType(style.renderer) === FRAME_RENDERER_TYPES.FILM_FRAME
+    ? normalizeFilmFrameStyle(style)
+    : null;
+  const overlay = canonical && canonical.material.textureOverlay;
+  const root = overlay ? overlay.root : style.maskRoot;
+  const variants = overlay ? overlay.variants : style.maskVariants;
+  if (!root || !variants) return null;
+  const selected = Math.max(1, Math.min(variants, Number(variant) || 1));
   const variantFolder = `variant-${String(selected).padStart(2, '0')}`;
   const tier = getStrengthPreset(style.id, strengthLevel).maskTier || strengthLevel;
-  const basePath = style.maskTiered === false
-    ? `/${style.maskRoot}/${variantFolder}`
-    : `/${style.maskRoot}/${tier}/${variantFolder}`;
+  const tiered = overlay ? overlay.tiered : style.maskTiered !== false;
+  const basePath = tiered ? `/${root}/${tier}/${variantFolder}` : `/${root}/${variantFolder}`;
   return MASK_SEGMENTS.reduce((result, segment) => {
     result[segment] = `${basePath}/${segment}.png`;
     return result;
@@ -423,19 +442,20 @@ function drawMediumFormatFrame({ ctx, image, photoRect, frameWidth, color, seed,
   return { ...paths, mediumFormat: true };
 }
 
-function drawFilmText(ctx, text, box, color, orientation, rotateForPortrait = false) {
-  if (!text || typeof ctx.fillText !== 'function') return;
+function drawFilmText(ctx, decoration) {
+  if (!decoration || !decoration.text || typeof ctx.fillText !== 'function') return;
+  const box = decoration.box;
   ctx.save();
-  ctx.fillStyle = color;
-  ctx.font = `${Math.max(8, Math.round(Math.min(box.width, box.height) * 0.9))}px sans-serif`;
+  ctx.fillStyle = decoration.color;
+  ctx.font = `${Math.max(8, decoration.fontSize || Math.round(Math.min(box.width, box.height) * 0.9))}px sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  if (orientation === 'portrait' && rotateForPortrait && typeof ctx.translate === 'function' && typeof ctx.rotate === 'function') {
+  if (decoration.rotation && typeof ctx.translate === 'function' && typeof ctx.rotate === 'function') {
     ctx.translate(box.x + box.width / 2, box.y + box.height / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillText(text, -box.height / 2, 0);
+    ctx.rotate(decoration.rotation);
+    ctx.fillText(decoration.text, -box.height / 2, 0);
   } else {
-    ctx.fillText(text, box.x, box.y + box.height / 2);
+    ctx.fillText(decoration.text, box.x, box.y + box.height / 2);
   }
   ctx.restore();
 }
@@ -453,34 +473,128 @@ function traceLayoutRectPath(ctx, rectangle) {
   }
 }
 
-function drawFilmMarker(ctx, marker, color) {
-  if (!marker) return;
+function traceRoundedRectPath(ctx, rectangle, radius) {
+  const r = Math.max(0, Math.min(radius || 0, rectangle.width / 2, rectangle.height / 2));
+  if (!r) return traceLayoutRectPath(ctx, rectangle);
+  ctx.beginPath();
+  ctx.moveTo(rectangle.x + r, rectangle.y);
+  ctx.lineTo(rectangle.x + rectangle.width - r, rectangle.y);
+  ctx.quadraticCurveTo(rectangle.x + rectangle.width, rectangle.y, rectangle.x + rectangle.width, rectangle.y + r);
+  ctx.lineTo(rectangle.x + rectangle.width, rectangle.y + rectangle.height - r);
+  ctx.quadraticCurveTo(rectangle.x + rectangle.width, rectangle.y + rectangle.height, rectangle.x + rectangle.width - r, rectangle.y + rectangle.height);
+  ctx.lineTo(rectangle.x + r, rectangle.y + rectangle.height);
+  ctx.quadraticCurveTo(rectangle.x, rectangle.y + rectangle.height, rectangle.x, rectangle.y + rectangle.height - r);
+  ctx.lineTo(rectangle.x, rectangle.y + r);
+  ctx.quadraticCurveTo(rectangle.x, rectangle.y, rectangle.x + r, rectangle.y);
+  ctx.closePath();
+}
+
+function traceAperturePath(ctx, aperture, config) {
+  if (config && config.shape === 'rounded-rect' && config.cornerRadiusRatio > 0) {
+    return traceRoundedRectPath(ctx, aperture, Math.min(aperture.width, aperture.height) * config.cornerRadiusRatio);
+  }
+  return traceLayoutRectPath(ctx, aperture);
+}
+
+function drawFilmMarker(ctx, marker) {
+  if (!marker || !marker.box) return;
+  const box = marker.box;
+  const color = marker.color || '#F3A126';
   ctx.save();
   ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(marker.x, marker.y + marker.height);
-  ctx.lineTo(marker.x + marker.width, marker.y + marker.height / 2);
-  ctx.lineTo(marker.x, marker.y);
-  ctx.closePath();
-  ctx.fill();
+  if (marker.type === 'square') {
+    ctx.fillRect(box.x, box.y, box.width, box.height);
+  } else if (marker.type === 'circle' && typeof ctx.arc === 'function') {
+    ctx.beginPath();
+    ctx.arc(box.x + box.width / 2, box.y + box.height / 2, Math.min(box.width, box.height) / 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (marker.type === 'line') {
+    ctx.fillRect(box.x, box.y + box.height * 0.42, box.width, Math.max(1, box.height * 0.16));
+  } else {
+    ctx.beginPath();
+    if (marker.type === 'arrow') {
+      ctx.moveTo(box.x, box.y + box.height * 0.36);
+      ctx.lineTo(box.x + box.width * 0.62, box.y + box.height * 0.36);
+      ctx.lineTo(box.x + box.width * 0.62, box.y);
+      ctx.lineTo(box.x + box.width, box.y + box.height / 2);
+      ctx.lineTo(box.x + box.width * 0.62, box.y + box.height);
+      ctx.lineTo(box.x + box.width * 0.62, box.y + box.height * 0.64);
+      ctx.lineTo(box.x, box.y + box.height * 0.64);
+    } else {
+      ctx.moveTo(box.x, box.y + box.height);
+      ctx.lineTo(box.x + box.width, box.y + box.height / 2);
+      ctx.lineTo(box.x, box.y);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
   ctx.restore();
 }
 
-function drawFilmRebateLayoutFrame({ ctx, image, layout, style, color, backgroundColor, imageZoom = 1, framePerforationsEnabled = true, frameEdgeLabelEnabled = true, frameNumberEnabled = true, frameMarkersEnabled = true, frameIndex = 1 }) {
+function drawFilmCutout(ctx, perforation, backgroundColor) {
+  if (!perforation || !perforation.box) return;
+  const box = perforation.box;
+  const color = perforation.color === 'outer-background'
+    ? backgroundColor
+    : perforation.color;
+  const erase = !color || color === 'transparent';
+  ctx.save();
+  if (erase) ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = erase ? '#000000' : color;
+  if (perforation.shape === 'circle' && typeof ctx.arc === 'function') {
+    ctx.beginPath();
+    ctx.arc(box.x + box.width / 2, box.y + box.height / 2, Math.min(box.width, box.height) / 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (perforation.shape === 'rounded-rect') {
+    traceRoundedRectPath(ctx, box, Math.min(box.width, box.height) * (perforation.cornerRadiusRatio || 0));
+    ctx.fill();
+  } else {
+    ctx.fillRect(box.x, box.y, box.width, box.height);
+  }
+  ctx.restore();
+}
+
+function drawTextureOverlay(ctx, textureOverlay, maskImages, frameRect, apertureRect) {
+  if (!textureOverlay || !maskImages || !MASK_SEGMENTS.every(segment => maskImages[segment])) return;
+  const thickness = Math.max(2, Math.min(frameRect.width, frameRect.height) * 0.045);
+  const corner = Math.max(thickness * 2, 8);
+  const horizontal = Math.max(1, frameRect.width - corner * 2);
+  const vertical = Math.max(1, frameRect.height - corner * 2);
+  const outer = textureOverlay.placement === 'outer-edge' ? thickness * 0.72 : 0;
+  const inner = textureOverlay.placement === 'inner-edge' ? thickness * 0.55 : 0;
+  const boxes = {
+    'top-left': [frameRect.x - outer, frameRect.y - outer, corner + outer, corner + outer],
+    top: [frameRect.x + corner, frameRect.y - outer + inner, horizontal, thickness + outer],
+    'top-right': [frameRect.x + frameRect.width - corner, frameRect.y - outer, corner + outer, corner + outer],
+    right: [frameRect.x + frameRect.width - thickness - inner, frameRect.y + corner, thickness + outer, vertical],
+    'bottom-right': [frameRect.x + frameRect.width - corner, frameRect.y + frameRect.height - corner, corner + outer, corner + outer],
+    bottom: [frameRect.x + corner, frameRect.y + frameRect.height - thickness - inner, horizontal, thickness + outer],
+    'bottom-left': [frameRect.x - outer, frameRect.y + frameRect.height - corner, corner + outer, corner + outer],
+    left: [frameRect.x - outer + inner, frameRect.y + corner, thickness + outer, vertical]
+  };
+  ctx.save();
+  MASK_SEGMENTS.forEach(segment => {
+    const box = boxes[segment];
+    ctx.drawImage(maskImages[segment], box[0], box[1], box[2], box[3]);
+  });
+  ctx.restore();
+}
+
+function drawFilmFrame({ ctx, image, layout, style, color, backgroundColor, imageZoom = 1, framePerforationsEnabled = true, frameEdgeLabelEnabled = true, frameNumberEnabled = true, frameMarkersEnabled = true, maskImages }) {
   if (!layout || !layout.frameRect || !layout.apertureRect) return null;
+  const canonical = layout.style || normalizeFilmFrameStyle(style);
   const frame = layout.frameRect;
   const aperture = layout.apertureRect;
   const decoration = layout.decorationRects || {};
-  const accent = '#F3A126';
   ctx.save();
-  ctx.fillStyle = color || style.color || '#030303';
+  ctx.fillStyle = color || canonical.frame.color || '#030303';
   ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
   ctx.restore();
 
   // The aperture is always a hard rectangle. Structured rebates must never
   // reuse the smooth irregular path used by material-like borders.
   ctx.save();
-  traceLayoutRectPath(ctx, aperture);
+  traceAperturePath(ctx, aperture, canonical.geometry.aperture);
   ctx.clip();
   const imageDrawRect = calculateApertureImageRect({
     apertureRect: aperture,
@@ -491,25 +605,25 @@ function drawFilmRebateLayoutFrame({ ctx, image, layout, style, color, backgroun
   ctx.drawImage(image, imageDrawRect.x, imageDrawRect.y, imageDrawRect.width, imageDrawRect.height);
   ctx.restore();
 
-  if (style.supportsPerforations && framePerforationsEnabled) {
-    decoration.perforations.forEach(perforation => drawCutout(ctx, perforation.x, perforation.y, perforation.width, perforation.height, backgroundColor));
-  }
-  if (style.supportsEdgeLabel && frameEdgeLabelEnabled) {
-    const label = style.id === 'film-strip-35mm-full' ? 'BATCHFRAME COLOR 400' : 'BATCHFRAME  ·  07';
-    drawFilmText(ctx, label, decoration.labels[0], accent, layout.orientation, style.id === 'film-strip-35mm-full');
-  }
-  if (style.supportsFrameNumber && frameNumberEnabled) {
-    decoration.frameNumbers.forEach((box, index) => drawFilmText(ctx, index === 0 ? String(frameIndex).padStart(2, '0') : `${frameIndex}A`, box, accent, layout.orientation, style.id === 'film-strip-35mm-full'));
-  }
-  if (style.supportsMarkers && frameMarkersEnabled) decoration.markers.forEach(marker => drawFilmMarker(ctx, marker, accent));
+  if (framePerforationsEnabled) decoration.perforations.forEach(perforation => drawFilmCutout(ctx, perforation, backgroundColor));
+  if (frameEdgeLabelEnabled) decoration.labels.forEach(label => drawFilmText(ctx, label));
+  if (frameNumberEnabled) decoration.frameNumbers.forEach(number => drawFilmText(ctx, number));
+  if (frameMarkersEnabled) decoration.markers.forEach(marker => drawFilmMarker(ctx, marker));
+  drawTextureOverlay(ctx, canonical.material.textureOverlay, maskImages, frame, aperture);
   return {
     frameRect: frame,
     apertureRect: aperture,
     decorationRects: decoration,
     imageDrawRect,
     orientation: layout.orientation,
-    frameSizePreset: layout.frameSizePreset
+    frameSizePreset: layout.frameSizePreset,
+    material: canonical.material
   };
+}
+
+// Retained as the public compatibility entry for saved legacy renderer types.
+function drawFilmRebateLayoutFrame(options) {
+  return drawFilmFrame(options);
 }
 
 function drawFragments(ctx, paths, seed, color, density, sizeScale = 1) {
@@ -547,6 +661,7 @@ const FRAME_RENDERERS = Object.freeze({
   [FRAME_RENDERER_TYPES.MEDIUM_FORMAT_REBATE]: drawMediumFormatFrame,
   [FRAME_RENDERER_TYPES.EMULSION_MASK]: drawEmulsionDamageFrame,
   [FRAME_RENDERER_TYPES.SCAN_EMULSION_EDGE]: drawScanEmulsionEdgeFrame,
+  [FRAME_RENDERER_TYPES.FILM_FRAME]: drawFilmFrame,
   [FRAME_RENDERER_TYPES.FILM_REBATE_LAYOUT]: drawFilmRebateLayoutFrame
 });
 
@@ -564,6 +679,7 @@ module.exports = {
   createSeededRandom,
   generateNormalizedEdgeProfile,
   getCachedNormalizedEdgeProfile,
+  selectTextureVariant,
   selectMaskVariant,
   getMaskAssetPaths,
   buildFramePaths,
@@ -578,6 +694,10 @@ module.exports = {
   drawMediumFormatFrame,
   drawEmulsionDamageFrame,
   drawScanEmulsionEdgeFrame,
+  drawFilmFrame,
+  drawFilmRebateLayoutFrame,
+  drawFilmMarker,
+  drawTextureOverlay,
   getScanEmulsionSideWidths,
-  drawFilmRebateLayoutFrame
+  traceAperturePath
 };
