@@ -49,6 +49,7 @@ function styleControlPatch(style) {
     currentStyleSupportsEdgeLabel: !!(style && style.supportsEdgeLabel),
     currentStyleSupportsFrameNumber: !!(style && style.supportsFrameNumber),
     currentStyleSupportsMarkers: !!(style && style.supportsMarkers),
+    frameDetailsExpanded: false,
     frameSizePreset: structured ? 'standard' : 'standard',
     framePerforationsEnabled: structured ? style.supportsPerforations !== false : true,
     frameEdgeLabelEnabled: structured ? style.supportsEdgeLabel !== false : true,
@@ -96,6 +97,7 @@ Page({
     frameEdgeLabelEnabled: true,
     frameNumberEnabled: true,
     frameMarkersEnabled: true,
+    frameDetailsExpanded: false,
     templates: [
       { id: 'white-clean', name: '白底经典', outerBgColor: '#FFFFFF', styleId: 'clean-black', previewAsset: stylePreviewAsset('clean-black'), enableOuterBg: true },
       { id: 'white-scan', name: '白底扫描', outerBgColor: '#FFFFFF', styleId: 'full-frame-scan', previewAsset: stylePreviewAsset('full-frame-scan'), enableOuterBg: true },
@@ -609,6 +611,8 @@ Page({
     const current = parseInt(this.data.borderPx, 10) || 8;
     this.applyBorder(current + 1); 
   },
+  onBorderSliderChanging(e){ this.applyBorder(e.detail.value); },
+  onBorderSliderChange(e){ this.applyBorder(e.detail.value); },
   onImageZoomChanging(e){ this.applyImageZoom(e.detail.value, true); },
   onImageZoomChange(e){ this.applyImageZoom(e.detail.value, true); },
   resetCurrentImageZoom(){ this.applyImageZoom(100, false); },
@@ -630,6 +634,10 @@ Page({
 
   onFrameSizePresetTap(e){
     this.setData({ frameSizePreset: e.currentTarget.dataset.preset }, this.redrawPreview);
+  },
+
+  toggleFrameDetails(){
+    this.setData({ frameDetailsExpanded: !this.data.frameDetailsExpanded });
   },
 
   toggleFramePerforations(e){

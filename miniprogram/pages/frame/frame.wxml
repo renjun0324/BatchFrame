@@ -1,10 +1,9 @@
 <view class="workspace">
-  <view class="top-bar">
-    <view class="top-title" wx:if="{{images.length}}">
-      <text class="app-name">已选照片</text>
-      <text class="selection-count" wx:if="{{images.length}}">{{images.length}} 张</text>
+  <view class="top-bar" wx:if="{{images.length}}">
+    <view class="top-title">
+      <text class="app-name">{{images.length}} 张照片</text>
     </view>
-    <button class="btn primary compact-btn" bindtap="chooseImages">{{images.length?'添加照片':'选择照片'}}</button>
+    <view class="top-add" bindtap="chooseImages">＋ 添加</view>
   </view>
 
   <view class="preview-stage">
@@ -39,15 +38,14 @@
       <text wx:if="{{item==='canvas'}}">画面</text>
       <text wx:if="{{item==='frame'}}">内框</text>
     </view>
-    <view class="panel-toggle" bindtap="togglePanel">
-      <view class="panel-toggle-icon {{panelExpanded?'up':''}}"></view>
-    </view>
   </view>
 
   <view class="setting-sheet {{panelExpanded?'expanded':'collapsed'}}">
+    <view class="panel-handle" bindtap="togglePanel" aria-label="展开或收起设置面板">
+      <view class="panel-handle-bar {{panelExpanded?'expanded':''}}"></view>
+    </view>
     <scroll-view class="setting-scroll" scroll-y scroll-top="{{panelScrollTop}}">
       <view wx:if="{{activeTool==='template'}}" class="tool-panel">
-        <view class="panel-heading">模板</view>
         <scroll-view class="template-list" scroll-x>
           <view wx:for="{{templates}}" wx:key="id"
                 class="template-card {{innerFrameStyleId===item.styleId && outerBgColor===item.outerBgColor?'active':''}}"
@@ -61,7 +59,6 @@
       </view>
 
       <view wx:if="{{activeTool==='canvas'}}" class="tool-panel">
-        <view class="panel-heading">画面</view>
         <text class="field-label">输出比例</text>
         <scroll-view class="chip-row" scroll-x>
           <view wx:for="{{ratioOptions}}" wx:key="*this"
@@ -79,7 +76,7 @@
         </view>
         <view class="setting-row">
           <text>外层背景</text>
-          <switch checked="{{enableOuterBg}}" bindchange="toggleOuterBg" color="#9E4F2B"/>
+          <switch checked="{{enableOuterBg}}" bindchange="toggleOuterBg" color="#A65332"/>
         </view>
         <view class="color-options compact-colors" wx:if="{{enableOuterBg}}">
           <view wx:for="{{colorPresets}}" wx:key="*this" wx:for-item="color"
@@ -94,7 +91,7 @@
           </view>
           <slider min="50" max="200" step="1" value="{{imageZoomPct}}"
                   bindchanging="onImageZoomChanging" bindchange="onImageZoomChange"
-                  activeColor="#9E4F2B" backgroundColor="#D8D0C3" block-color="#9E4F2B"/>
+                  activeColor="#A65332" backgroundColor="#DDD6CA" block-color="#A65332"/>
           <view class="adjustment-footer">
             <text class="panel-hint">缩小或放大当前照片</text>
             <button class="text-action" bindtap="resetCurrentImageZoom">恢复</button>
@@ -103,7 +100,6 @@
       </view>
 
       <view wx:if="{{activeTool==='frame'}}" class="tool-panel">
-        <view class="panel-heading">内框</view>
         <view class="frame-group-title">基础内框</view>
         <scroll-view class="frame-style-list" scroll-x>
             <view wx:for="{{basicFrameStyles}}" wx:key="id"
@@ -126,13 +122,14 @@
             <text>{{item.name}}</text>
           </view>
         </scroll-view>
-        <view class="setting-row" wx:if="{{innerFrameStyleId!=='none' && !currentStyleIsStructured}}">
-          <text>内框宽度</text>
-          <view class="inline-actions">
-            <button class="btn ghost mini-btn" bindtap="decBorder">－</button>
-            <input class="small-input" type="digit" value="{{borderPx}}" bindinput="onBorderInput" bindblur="onBorderBlur"/>
-            <button class="btn ghost mini-btn" bindtap="incBorder">＋</button>
+        <view class="frame-width-control" wx:if="{{innerFrameStyleId!=='none' && !currentStyleIsStructured}}">
+          <view class="adjustment-heading">
+            <text>内框宽度</text>
+            <text class="setting-value">{{borderPx}}</text>
           </view>
+          <slider min="0" max="80" step="1" value="{{borderPx}}"
+                  bindchanging="onBorderSliderChanging" bindchange="onBorderSliderChange"
+                  activeColor="#A65332" backgroundColor="#DDD6CA" block-color="#A65332"/>
         </view>
         <view wx:if="{{currentStyleSupportsStrength}}">
           <text class="field-label">边缘强度</text>
@@ -158,14 +155,15 @@
                   class="choice-chip {{frameSizePreset===item.id?'active':''}}"
                   data-preset="{{item.id}}" bindtap="onFrameSizePresetTap">{{item.name}}</view>
           </view>
-          <view class="setting-row" wx:if="{{currentStyleSupportsPerforations}}"><text>齿孔</text><switch checked="{{framePerforationsEnabled}}" bindchange="toggleFramePerforations" color="#9E4F2B"/></view>
-          <view class="setting-row" wx:if="{{currentStyleSupportsEdgeLabel}}"><text>边码</text><switch checked="{{frameEdgeLabelEnabled}}" bindchange="toggleFrameEdgeLabel" color="#9E4F2B"/></view>
-          <view class="setting-row" wx:if="{{currentStyleSupportsFrameNumber}}"><text>帧号</text><switch checked="{{frameNumberEnabled}}" bindchange="toggleFrameNumber" color="#9E4F2B"/></view>
-          <view class="setting-row" wx:if="{{currentStyleSupportsMarkers}}"><text>角标</text><switch checked="{{frameMarkersEnabled}}" bindchange="toggleFrameMarkers" color="#9E4F2B"/></view>
-        </view>
-        <view class="setting-row">
-          <text>启用内框</text>
-          <switch checked="{{enableInnerBorder}}" bindchange="toggleInnerBorder" color="#9E4F2B"/>
+          <view class="advanced-toggle" bindtap="toggleFrameDetails">
+            <text>细节设置</text><text class="advanced-chevron {{frameDetailsExpanded?'up':''}}">⌄</text>
+          </view>
+          <view wx:if="{{frameDetailsExpanded}}" class="advanced-settings">
+            <view class="setting-row" wx:if="{{currentStyleSupportsPerforations}}"><text>齿孔</text><switch checked="{{framePerforationsEnabled}}" bindchange="toggleFramePerforations" color="#A65332"/></view>
+            <view class="setting-row" wx:if="{{currentStyleSupportsEdgeLabel}}"><text>边码</text><switch checked="{{frameEdgeLabelEnabled}}" bindchange="toggleFrameEdgeLabel" color="#A65332"/></view>
+            <view class="setting-row" wx:if="{{currentStyleSupportsFrameNumber}}"><text>帧号</text><switch checked="{{frameNumberEnabled}}" bindchange="toggleFrameNumber" color="#A65332"/></view>
+            <view class="setting-row" wx:if="{{currentStyleSupportsMarkers}}"><text>角标</text><switch checked="{{frameMarkersEnabled}}" bindchange="toggleFrameMarkers" color="#A65332"/></view>
+          </view>
         </view>
       </view>
     </scroll-view>
@@ -184,9 +182,9 @@
       <view class="color-picker-header"><text class="color-picker-title">自定义颜色</text><view bindtap="closeColorPicker">×</view></view>
       <view class="color-picker-body">
         <view class="color-preview-section"><view class="color-preview-box" style="background:{{currentPickerColor}}"></view><text>{{currentPickerColor}}</text></view>
-        <slider min="0" max="360" value="{{hue}}" bindchange="onHueChange" activeColor="#9E4F2B"/>
-        <slider min="0" max="100" value="{{saturation}}" bindchange="onSaturationChange" activeColor="#9E4F2B"/>
-        <slider min="0" max="100" value="{{lightness}}" bindchange="onLightnessChange" activeColor="#9E4F2B"/>
+        <slider min="0" max="360" value="{{hue}}" bindchange="onHueChange" activeColor="#A65332"/>
+        <slider min="0" max="100" value="{{saturation}}" bindchange="onSaturationChange" activeColor="#A65332"/>
+        <slider min="0" max="100" value="{{lightness}}" bindchange="onLightnessChange" activeColor="#A65332"/>
       </view>
       <view class="color-picker-footer"><button class="btn ghost" bindtap="closeColorPicker">取消</button><button class="btn primary" bindtap="confirmColorPicker">确定</button></view>
     </view>
