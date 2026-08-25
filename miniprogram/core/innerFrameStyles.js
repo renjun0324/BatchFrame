@@ -11,6 +11,7 @@ const FRAME_RENDERER_TYPES = Object.freeze({
   MEDIUM_FORMAT_REBATE: 'medium-format-rebate',
   EMULSION_MASK: 'emulsion-mask',
   SCAN_EMULSION_EDGE: 'scan-emulsion-edge',
+  FILM_FRAME: 'film-frame',
   FILM_REBATE_LAYOUT: 'film-rebate-layout'
 });
 
