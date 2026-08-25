@@ -23,6 +23,12 @@ STYLE_IDS = [
     'film-110-pocket',
     'film-contact-sheet',
 ]
+RUNTIME_PREVIEW_IDS = [
+    'film-strip-35mm-full',
+    'film-rebate-minimal',
+    'medium-format-120',
+    *STYLE_IDS,
+]
 STYLE_LABELS = {
     'film-35mm-mono': '35mm 黑白片基',
     'film-35mm-warm': '35mm 暖调片基',
@@ -183,10 +189,31 @@ def render(style_id, size, margin, title=None, source=None):
     return canvas, layout
 
 
+def render_legacy_medium_preview(size, source):
+    """Rebuild the existing legacy 120 selector with the common neutral photo.
+
+    The runtime legacy renderer remains untouched; this maintains its visible
+    asymmetric body and archive dot while removing the obsolete UI screenshot
+    from its selector asset.
+    """
+    canvas = Image.new('RGB', size, '#EEE9DF')
+    draw = ImageDraw.Draw(canvas)
+    box = {'x': size[0] * .23, 'y': size[1] * .19, 'width': size[0] * .55, 'height': size[1] * .63}
+    top, right, bottom, left = 8, 7, 9, 13
+    draw.rectangle((round(box['x'] - left), round(box['y'] - top),
+                    round(box['x'] + box['width'] + right), round(box['y'] + box['height'] + bottom)), fill='#030303')
+    paste_aperture(canvas, source, box)
+    draw.ellipse((round(box['x'] - left * .72), round(box['y'] + box['height'] * .47),
+                  round(box['x'] - left * .2), round(box['y'] + box['height'] * .6)), fill='#EEE9DF')
+    draw.text((round(box['x'] - left + 2), round(box['y'] + box['height'] + 2)), '07', fill='#EEE9DF', font=font(8))
+    return canvas
+
+
 def generate_previews():
     PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
-    for style_id in STYLE_IDS:
-        image, _ = render(style_id, (240, 150), 18)
+    source = photo_source()
+    for style_id in RUNTIME_PREVIEW_IDS:
+        image = render_legacy_medium_preview((240, 150), source) if style_id == 'medium-format-120' else render(style_id, (240, 150), 18, source=source)[0]
         output = PREVIEW_DIR / f'{style_id}.png'
         image.save(output, optimize=True)
         if output.stat().st_size > 15 * 1024:
