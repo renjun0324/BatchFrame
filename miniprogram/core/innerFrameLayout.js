@@ -1,10 +1,8 @@
-/**
- * Pure geometry for structured film-rebate inner frames.
- *
- * The output canvas, the complete inner-frame module and the photo aperture
- * are deliberately separate rectangles. No Canvas or image objects belong in
- * this module.
- */
+const {
+  normalizeFilmFrameStyle,
+  resolveFrameNumberValue,
+  resolvePortraitRotation
+} = require('./filmFrameStyle');
 
 function positive(value, fallback = 0) {
   const number = Number(value);
@@ -29,80 +27,67 @@ function scaleAroundCenter(rectangle, scale, bounds) {
   const safeScale = Math.max(0.3, Math.min(1.5, positive(scale, 1)));
   const width = Math.min(bounds.width, Math.max(1, rectangle.width * safeScale));
   const height = Math.min(bounds.height, Math.max(1, rectangle.height * safeScale));
-  return rect(
-    bounds.x + (bounds.width - width) / 2,
-    bounds.y + (bounds.height - height) / 2,
-    width,
-    height
-  );
+  return rect(bounds.x + (bounds.width - width) / 2, bounds.y + (bounds.height - height) / 2, width, height);
 }
 
 function contains(outer, inner) {
-  return inner.x >= outer.x - 1e-6 &&
-    inner.y >= outer.y - 1e-6 &&
+  return inner.x >= outer.x - 1e-6 && inner.y >= outer.y - 1e-6 &&
     inner.x + inner.width <= outer.x + outer.width + 1e-6 &&
     inner.y + inner.height <= outer.y + outer.height + 1e-6;
 }
 
-function orientRebates(rebates, orientation) {
-  if (orientation !== 'portrait') return { ...rebates };
-  // Rotate the canonical horizontal film strip so its thick rebates become
-  // the left/right rebates for a portrait image.
-  return {
-    top: rebates.left,
-    right: rebates.top,
-    bottom: rebates.right,
-    left: rebates.bottom
+function rotateSide(side) {
+  return { top: 'right', right: 'bottom', bottom: 'left', left: 'top' }[side] || side;
+}
+
+function rotateAnchor(anchor) {
+  const map = {
+    'top-start': 'right-start', 'top-center': 'right-center', 'top-end': 'right-end',
+    'right-start': 'bottom-start', 'right-center': 'bottom-center', 'right-end': 'bottom-end',
+    'bottom-start': 'left-start', 'bottom-center': 'left-center', 'bottom-end': 'left-end',
+    'left-start': 'top-start', 'left-center': 'top-center', 'left-end': 'top-end',
+    'corner-top-left': 'corner-top-right', 'corner-top-right': 'corner-bottom-right',
+    'corner-bottom-right': 'corner-bottom-left', 'corner-bottom-left': 'corner-top-left'
   };
+  return map[anchor] || anchor;
+}
+
+function shouldRotate(canonicalStyle, orientation) {
+  return orientation === 'portrait' && canonicalStyle.geometry.orientationPolicy === 'rotate-film-layout';
 }
 
 function resolveRebates(style, frameSizePreset, orientation) {
-  const geometry = style && (style.geometry || (style.filmLayout && style.filmLayout.geometry));
-  const base = geometry && geometry.rebates ? geometry.rebates : {
-    topRatio: 0.032,
-    rightRatio: 0.032,
-    bottomRatio: 0.032,
-    leftRatio: 0.032
+  const canonical = normalizeFilmFrameStyle(style);
+  const preset = canonical.frame.sizePresets[frameSizePreset] || canonical.frame.sizePresets.standard;
+  const base = canonical.geometry.rebates;
+  const rebates = {
+    top: Math.max(0.005, base.top * preset.top),
+    right: Math.max(0.005, base.right * preset.right),
+    bottom: Math.max(0.005, base.bottom * preset.bottom),
+    left: Math.max(0.005, base.left * preset.left)
   };
-  const presets = style && (style.sizePresets || (style.filmLayout && style.filmLayout.sizePresets));
-  const preset = presets && presets[frameSizePreset];
-  const scales = preset || { topScale: 1, rightScale: 1, bottomScale: 1, leftScale: 1 };
-  return orientRebates({
-    top: Math.max(0.005, base.topRatio * scales.topScale),
-    right: Math.max(0.005, base.rightRatio * scales.rightScale),
-    bottom: Math.max(0.005, base.bottomRatio * scales.bottomScale),
-    left: Math.max(0.005, base.leftRatio * scales.leftScale)
-  }, orientation);
+  if (!shouldRotate(canonical, orientation)) return rebates;
+  return { top: rebates.left, right: rebates.top, bottom: rebates.right, left: rebates.bottom };
 }
 
 function fitFrameRect(available, imageAspect, rebates) {
   const safeAspect = Math.max(0.05, positive(imageAspect, 1));
   const apertureWidthRatio = Math.max(0.05, 1 - rebates.left - rebates.right);
   const apertureHeightRatio = Math.max(0.05, 1 - rebates.top - rebates.bottom);
-  const frameAspect = safeAspect * apertureHeightRatio === 0
-    ? available.width / available.height
-    : safeAspect / (apertureWidthRatio / apertureHeightRatio);
+  const frameAspect = safeAspect / (apertureWidthRatio / apertureHeightRatio);
   let width = available.width;
   let height = width / frameAspect;
   if (height > available.height) {
     height = available.height;
     width = height * frameAspect;
   }
-  return rect(
-    available.x + (available.width - width) / 2,
-    available.y + (available.height - height) / 2,
-    Math.max(1, width),
-    Math.max(1, height)
-  );
+  return rect(available.x + (available.width - width) / 2, available.y + (available.height - height) / 2,
+    Math.max(1, width), Math.max(1, height));
 }
 
 function apertureFromFrame(frame, rebates) {
-  return rect(
-    frame.x + frame.width * rebates.left,
-    frame.y + frame.height * rebates.top,
-    frame.width * (1 - rebates.left - rebates.right),
-    frame.height * (1 - rebates.top - rebates.bottom)
-  );
+  return rect(frame.x + frame.width * rebates.left, frame.y + frame.height * rebates.top,
+    frame.width * (1 - rebates.left - rebates.right), frame.height * (1 - rebates.top - rebates.bottom));
 }
 
 function evenlySpaced(count, start, end) {
@@ -111,69 +96,122 @@ function evenlySpaced(count, start, end) {
   return Array.from({ length: count }, (_, index) => start + (end - start) * index / (count - 1));
 }
 
-function filmPerforations(frame, rebates, style, orientation) {
-  const config = style.perforations || (style.filmLayout && style.filmLayout.perforations);
-  if (!config || !config.enabled) return [];
-  const count = Math.max(0, Math.floor(config.count || 8));
+function resolvePerforationPositions(config, count, start, end, holeSpan) {
+  if (config.gapPolicy !== 'fixed' || count <= 1) return evenlySpaced(count, start, end);
+  const maxStep = (end - start) / Math.max(1, count - 1);
+  const step = Math.min(maxStep, Math.max(holeSpan, holeSpan * config.gapRatio));
+  const center = (start + end) / 2;
+  return Array.from({ length: count }, (_, index) => center + (index - (count - 1) / 2) * step);
+}
+
+function resolvePerforationSides(config, canonical, orientation) {
+  const sides = config.sides || [];
+  return shouldRotate(canonical, orientation) ? sides.map(rotateSide) : sides.slice();
+}
+
+function layoutFilmPerforations(frame, rebates, canonical, orientation) {
+  const config = canonical.perforations;
+  if (!config.enabled || !config.sides.length || !config.count) return [];
   const result = [];
-  const horizontal = orientation !== 'portrait';
-  if (horizontal) {
-    const width = frame.width * config.widthRatio;
-    const height = frame.height * config.heightRatio;
-    evenlySpaced(count, frame.x + width / 2, frame.x + frame.width - width / 2).forEach(x => {
-      result.push(rect(x - width / 2, frame.y + frame.height * rebates.top * 0.22, width, height));
-      result.push(rect(x - width / 2, frame.y + frame.height - frame.height * rebates.bottom * 0.22 - height, width, height));
+  resolvePerforationSides(config, canonical, orientation).forEach(side => {
+    const horizontal = side === 'top' || side === 'bottom';
+    const holeWidth = horizontal ? frame.width * config.widthRatio : frame.width * config.heightRatio;
+    const holeHeight = horizontal ? frame.height * config.heightRatio : frame.height * config.widthRatio;
+    const axisStart = horizontal ? frame.x + holeWidth / 2 : frame.y + holeHeight / 2;
+    const axisEnd = horizontal ? frame.x + frame.width - holeWidth / 2 : frame.y + frame.height - holeHeight / 2;
+    resolvePerforationPositions(config, config.count, axisStart, axisEnd, horizontal ? holeWidth : holeHeight).forEach(position => {
+      let box;
+      if (side === 'top') box = rect(position - holeWidth / 2, frame.y + frame.height * rebates.top * 0.22, holeWidth, holeHeight);
+      if (side === 'bottom') box = rect(position - holeWidth / 2, frame.y + frame.height - frame.height * rebates.bottom * 0.22 - holeHeight, holeWidth, holeHeight);
+      if (side === 'left') box = rect(frame.x + frame.width * rebates.left * 0.22, position - holeHeight / 2, holeWidth, holeHeight);
+      if (side === 'right') box = rect(frame.x + frame.width - frame.width * rebates.right * 0.22 - holeWidth, position - holeHeight / 2, holeWidth, holeHeight);
+      result.push({ box, ...box, side, shape: config.shape, cornerRadiusRatio: config.cornerRadiusRatio, color: config.color });
     });
-  } else {
-    const width = frame.width * config.heightRatio;
-    const height = frame.height * config.widthRatio;
-    evenlySpaced(count, frame.y + height / 2, frame.y + frame.height - height / 2).forEach(y => {
-      result.push(rect(frame.x + frame.width * rebates.left * 0.22, y - height / 2, width, height));
-      result.push(rect(frame.x + frame.width - frame.width * rebates.right * 0.22 - width, y - height / 2, width, height));
-    });
-  }
+  });
   return result;
 }
 
-function decorationRects(frame, aperture, style, orientation, rebates) {
-  const layout = style || {};
-  const legacy = style.filmLayout || {};
-  const is35Portrait = style.id === 'film-strip-35mm-full' && orientation === 'portrait';
-  const labels = (layout.labels ? layout.labels.enabled : legacy.edgeLabel)
-    ? (is35Portrait
-      ? [rect(frame.x + frame.width * 0.025, frame.y + frame.height * 0.16, frame.width * rebates.left * 0.82, frame.height * 0.56)]
-      : [rect(frame.x + frame.width * 0.04, frame.y + frame.height * 0.04, frame.width * 0.35, Math.max(8, frame.height * 0.04))])
-    : [];
-  const frameNumbers = (layout.frameNumbers ? layout.frameNumbers.enabled : legacy.frameNumber)
-    ? (is35Portrait
-      ? [rect(frame.x + frame.width * 0.835, frame.y + frame.height * 0.18, frame.width * rebates.right * 0.82, frame.height * 0.18)]
-      : [rect(frame.x + frame.width * 0.04, frame.y + frame.height * 0.9, frame.width * 0.12, Math.max(8, frame.height * 0.04)), rect(frame.x + frame.width * 0.46, frame.y + frame.height * 0.9, frame.width * 0.08, Math.max(8, frame.height * 0.04))])
-    : [];
+function rebateBox(frame, aperture, anchor) {
+  const side = anchor.split('-')[0];
+  if (side === 'top') return rect(frame.x, frame.y, frame.width, Math.max(1, aperture.y - frame.y));
+  if (side === 'bottom') return rect(frame.x, aperture.y + aperture.height, frame.width, Math.max(1, frame.y + frame.height - aperture.y - aperture.height));
+  if (side === 'left') return rect(frame.x, frame.y, Math.max(1, aperture.x - frame.x), frame.height);
+  return rect(aperture.x + aperture.width, frame.y, Math.max(1, frame.x + frame.width - aperture.x - aperture.width), frame.height);
+}
+
+function resolveDecorationAnchor({ frameRect, apertureRect, rebates, anchor, orientation, orientationPolicy, sizeRatio = 0.035, spanRatio = 0.18 }) {
+  const rotate = orientation === 'portrait' && orientationPolicy === 'rotate-film-layout';
+  const effectiveAnchor = rotate ? rotateAnchor(anchor) : anchor;
+  const corner = effectiveAnchor.indexOf('corner-') === 0;
+  const minDimension = Math.min(frameRect.width, frameRect.height);
+  const markerSize = Math.max(2, minDimension * sizeRatio);
+  if (corner) {
+    const padding = markerSize * 0.55;
+    const end = effectiveAnchor.indexOf('right') >= 0;
+    const bottom = effectiveAnchor.indexOf('bottom') >= 0;
+    return {
+      anchor: effectiveAnchor,
+      box: rect(end ? frameRect.x + frameRect.width - markerSize - padding : frameRect.x + padding,
+        bottom ? frameRect.y + frameRect.height - markerSize - padding : frameRect.y + padding,
+        markerSize, markerSize)
+    };
+  }
+  const side = effectiveAnchor.split('-')[0];
+  const position = effectiveAnchor.split('-')[1] || 'center';
+  const rail = rebateBox(frameRect, apertureRect, effectiveAnchor);
+  const horizontal = side === 'top' || side === 'bottom';
+  const railLength = horizontal ? rail.width : rail.height;
+  const cross = horizontal ? rail.height : rail.width;
+  const length = Math.max(markerSize, railLength * spanRatio);
+  const thickness = Math.max(1, Math.min(cross * 0.72, markerSize * 1.45));
+  const edgePadding = Math.min(markerSize * 0.55, Math.max(0, (railLength - length) / 2));
+  const offset = position === 'start' ? edgePadding : position === 'end' ? railLength - length - edgePadding : (railLength - length) / 2;
   return {
-    perforations: filmPerforations(frame, rebates, style, orientation),
-    labels,
-    frameNumbers,
-    markers: (layout.markers ? layout.markers.enabled : legacy.markers) ? [
-      rect(frame.x + frame.width * 0.04, frame.y + frame.height * 0.82, frame.width * 0.018, frame.height * 0.018),
-      rect(frame.x + frame.width * 0.94, frame.y + frame.height * 0.82, frame.width * 0.018, frame.height * 0.018)
-    ] : [],
-    aperture
+    anchor: effectiveAnchor,
+    box: horizontal
+      ? rect(rail.x + offset, rail.y + (rail.height - thickness) / 2, length, thickness)
+      : rect(rail.x + (rail.width - thickness) / 2, rail.y + offset, thickness, length)
   };
 }
 
-function layoutInnerFrame({ outputRect, outerLayout = {}, imageAspect = 1, style, frameSizePreset = 'standard', orientation } = {}) {
+function layoutFilmDecorations({ frameRect, apertureRect, rebates, canonicalStyle, orientation, frameIndex }) {
+  const config = canonicalStyle.decorations;
+  const common = { frameRect, apertureRect, rebates, orientation, orientationPolicy: canonicalStyle.geometry.orientationPolicy };
+  const mapText = item => {
+    const resolved = resolveDecorationAnchor({ ...common, anchor: item.anchor, sizeRatio: item.sizeRatio, spanRatio: item.spanRatio });
+    return { box: resolved.box, ...resolved.box, anchor: resolved.anchor, text: item.text, color: item.color, fontSize: Math.max(8, Math.round(Math.min(frameRect.width, frameRect.height) * item.sizeRatio)), rotation: resolvePortraitRotation(item.portraitRotation, orientation) };
+  };
+  const mapNumber = item => {
+    const resolved = resolveDecorationAnchor({ ...common, anchor: item.anchor, sizeRatio: item.sizeRatio, spanRatio: item.spanRatio });
+    return { box: resolved.box, ...resolved.box, anchor: resolved.anchor, text: resolveFrameNumberValue(item.value, frameIndex), color: item.color, fontSize: Math.max(8, Math.round(Math.min(frameRect.width, frameRect.height) * item.sizeRatio)), rotation: resolvePortraitRotation(item.portraitRotation, orientation) };
+  };
+  const mapMarker = item => {
+    const resolved = resolveDecorationAnchor({ ...common, anchor: item.anchor, sizeRatio: item.sizeRatio, spanRatio: item.spanRatio });
+    return { box: resolved.box, ...resolved.box, anchor: resolved.anchor, type: item.type, color: item.color };
+  };
+  return {
+    perforations: layoutFilmPerforations(frameRect, rebates, canonicalStyle, orientation),
+    labels: config.labels.filter(item => item.enabled).map(mapText),
+    frameNumbers: config.frameNumbers.filter(item => item.enabled).map(mapNumber),
+    markers: config.markers.filter(item => item.enabled).map(mapMarker),
+    aperture: apertureRect
+  };
+}
+
+function layoutInnerFrame({ outputRect, outerLayout = {}, imageAspect = 1, style, frameSizePreset = 'standard', orientation, frameIndex = 1 } = {}) {
   if (!outputRect || !style) throw new Error('outputRect and style are required');
-  const output = rect(0, 0, Math.max(1, positive(outputRect.width, 1)), Math.max(1, positive(outputRect.height, 1)));
+  const canonicalStyle = normalizeFilmFrameStyle(style);
+  const output = rect(positive(outputRect.x), positive(outputRect.y), Math.max(1, positive(outputRect.width, 1)), Math.max(1, positive(outputRect.height, 1)));
   const padding = typeof outerLayout.padding === 'number'
     ? { top: outerLayout.padding, right: outerLayout.padding, bottom: outerLayout.padding, left: outerLayout.padding }
     : (outerLayout.padding || {});
   const baseAvailable = inset(output, padding);
   const available = scaleAroundCenter(baseAvailable, outerLayout.zoom == null ? 1 : outerLayout.zoom, output);
   const resolvedOrientation = orientation || (positive(imageAspect, 1) < 1 ? 'portrait' : 'landscape');
-  const rebates = resolveRebates(style, frameSizePreset, resolvedOrientation);
+  const rebates = resolveRebates(canonicalStyle, frameSizePreset, resolvedOrientation);
   const frameRect = fitFrameRect(available, imageAspect, rebates);
   const apertureRect = apertureFromFrame(frameRect, rebates);
-  const decorations = decorationRects(frameRect, apertureRect, style, resolvedOrientation, rebates);
+  const decorations = layoutFilmDecorations({ frameRect, apertureRect, rebates, canonicalStyle, orientation: resolvedOrientation, frameIndex });
   return {
     outputRect: output,
     innerAvailableRect: available,
@@ -183,6 +221,7 @@ function layoutInnerFrame({ outputRect, outerLayout = {}, imageAspect = 1, style
     rebates,
     orientation: resolvedOrientation,
     frameSizePreset,
+    style: canonicalStyle,
     containsFrame: contains(available, frameRect),
     containsAperture: contains(frameRect, apertureRect)
   };
@@ -193,5 +232,9 @@ module.exports = {
   contains,
   layoutInnerFrame,
   resolveRebates,
-  apertureFromFrame
+  apertureFromFrame,
+  resolveDecorationAnchor,
+  layoutFilmDecorations,
+  layoutFilmPerforations,
+  resolvePerforationPositions
 };

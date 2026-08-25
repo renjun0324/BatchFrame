@@ -62,9 +62,11 @@ function testNestedAndOrientation() {
         assert.strictEqual(result.decorationRects.perforations.length, 16);
         const first = result.decorationRects.perforations[0];
         if (orientation === 'portrait') {
-          assert(first.x <= result.frameRect.x + result.frameRect.width * 0.25);
+          assert.strictEqual(first.side, 'right');
+          assert(first.box.x >= result.apertureRect.x + result.apertureRect.width);
         } else {
-          assert(first.y <= result.frameRect.y + result.frameRect.height * 0.25);
+          assert.strictEqual(first.side, 'top');
+          assert(first.box.y + first.box.height <= result.apertureRect.y);
         }
         assert(result.decorationRects.labels.length === 1);
         assert(result.decorationRects.frameNumbers.length === 1 || result.decorationRects.frameNumbers.length === 2);

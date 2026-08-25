@@ -135,6 +135,7 @@ function normalizePerforations(style, legacy) {
     heightRatio: clamp(number(source.heightRatio, 0.077), 0.002, 0.3),
     cornerRadiusRatio: clamp(number(source.cornerRadiusRatio, 0.018), 0, 0.1),
     gapPolicy: source.gapPolicy === 'fixed' ? 'fixed' : 'even',
+    gapRatio: clamp(number(source.gapRatio, 1.5), 1, 8),
     color: source.color || 'outer-background'
   };
 }
